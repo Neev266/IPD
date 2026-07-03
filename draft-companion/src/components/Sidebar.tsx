@@ -26,7 +26,7 @@ const Sidebar = ({ drafts, activeDraft, onSelectDraft, onNewDraftClick, onDelete
       <div className="p-5 pt-8">
         <button
           onClick={onNewDraftClick}
-          className="w-full bg-[#353b49] text-white/95 rounded shadow-md py-3 px-4 font-sans font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#2b303b] transition-colors border border-white/10"
+          className="w-full bg-black text-white/95 rounded shadow-md py-3 px-4 font-sans font-medium text-sm flex items-center justify-center gap-2 hover:bg-neutral-900 transition-colors border border-white/10"
         >
           + New Draft
         </button>
