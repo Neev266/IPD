@@ -1,4 +1,4 @@
-import { Lock, FileText, Clock, Settings, ChevronDown, ChevronRight, Users } from "lucide-react";
+import { Lock, FileText, Clock, Settings, ChevronDown, ChevronRight, Users, Trash2 } from "lucide-react";
 import { useState } from "react";
 import nyayaLogo from "@/assets/nyaya-logo.png";
 
@@ -10,19 +10,24 @@ interface Draft {
 }
 
 interface SidebarProps {
-  drafts: Draft[];
+  drafts: any[]; // Changed from Draft[] to any[] or we can just import/type it loosely
   activeDraft: string;
   onSelectDraft: (id: string) => void;
+  onNewDraftClick?: () => void;
+  onDeleteDraft?: (id: string, e: React.MouseEvent) => void;
 }
 
-const Sidebar = ({ drafts, activeDraft, onSelectDraft }: SidebarProps) => {
+const Sidebar = ({ drafts, activeDraft, onSelectDraft, onNewDraftClick, onDeleteDraft }: SidebarProps) => {
   const [draftsOpen, setDraftsOpen] = useState(true);
   const [templatesOpen, setTemplatesOpen] = useState(false);
 
   return (
     <div className="w-[260px] min-w-[260px] bg-[#e6e2da]/20 flex flex-col h-full border-r border-[#d4cfc1]/60">
       <div className="p-5 pt-8">
-        <button className="w-full bg-[#353b49] text-white/95 rounded shadow-md py-3 px-4 font-sans font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#2b303b] transition-colors border border-white/10">
+        <button
+          onClick={onNewDraftClick}
+          className="w-full bg-[#353b49] text-white/95 rounded shadow-md py-3 px-4 font-sans font-medium text-sm flex items-center justify-center gap-2 hover:bg-[#2b303b] transition-colors border border-white/10"
+        >
           + New Draft
         </button>
       </div>
@@ -46,6 +51,7 @@ const Sidebar = ({ drafts, activeDraft, onSelectDraft }: SidebarProps) => {
                 active={draft.id === activeDraft}
                 icon={Lock}
                 onClick={() => onSelectDraft(draft.id)}
+                onDelete={(e) => onDeleteDraft && onDeleteDraft(draft.id, e)}
               />
             ))}
           </div>
@@ -114,6 +120,7 @@ const DraftItem = ({
   active,
   icon: Icon,
   onClick,
+  onDelete,
 }: {
   title: string;
   subtitle: string;
@@ -121,6 +128,7 @@ const DraftItem = ({
   active: boolean;
   icon: any;
   onClick: () => void;
+  onDelete?: (e: React.MouseEvent) => void;
 }) => (
   <button
     onClick={onClick}
@@ -131,16 +139,32 @@ const DraftItem = ({
   >
     <div className="flex items-start gap-3">
       <Icon size={16} className={`${active ? "text-[#555]" : "text-[#777]"} mt-0.5 flex-shrink-0`} />
-      <div className="flex-1 min-w-0 pr-6">
+      <div className="flex-1 min-w-0 pr-8">
         <div className="flex items-center justify-between mb-0.5">
           <p className="text-[13.5px] font-medium text-[#222] truncate">{title}</p>
         </div>
         <div className="flex items-center justify-between">
           <p className="text-[11px] text-[#666] truncate">{subtitle}</p>
-          <span className="text-[10px] text-[#888] flex-shrink-0 absolute right-3 top-[32%]">{date}</span>
+          <span className="text-[10px] text-[#888] flex-shrink-0 absolute right-3 top-[32%] group-hover:opacity-0 transition-opacity">{date}</span>
         </div>
       </div>
-      {active && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[#111]" />}
+
+      {/* Delete Draft Action Button */}
+      {onDelete && (
+        <span
+          onClick={(e) => {
+            e.stopPropagation();
+            onDelete(e);
+          }}
+          className="absolute right-2 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 p-1.5 text-neutral-400 hover:text-red-600 rounded-md hover:bg-red-50/50 transition-all duration-200 z-30 cursor-pointer"
+          title="Delete Draft"
+        >
+          <Trash2 size={13.5} />
+        </span>
+      )}
+
+      {/* Active Indicator dot (hidden on hover if delete button is visible) */}
+      {active && <div className="absolute right-3 top-1/2 -translate-y-1/2 w-1.5 h-1.5 rounded-full bg-[#111] group-hover:opacity-0 transition-opacity" />}
     </div>
   </button>
 );

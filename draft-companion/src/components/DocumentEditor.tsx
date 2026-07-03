@@ -216,15 +216,16 @@ export const DocumentEditor = ({
   clauses,
   onAddClause,
   focusedClauseId,
+  initialHtml,
 }: any) => {
   const [drafting, setDrafting] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
 
-  // Build pages with initial content from clauses —
+  // Build pages with initial content from clauses or raw HTML —
   // this runs on FIRST render so the first page already has HTML
   const [pages, setPages] = useState<PageData[]>(() => [
-    { id: createPageId(), html: buildClausesHtml(clauses) },
+    { id: createPageId(), html: initialHtml || buildClausesHtml(clauses) },
   ]);
 
   const pageElRefs = useRef<(HTMLDivElement | null)[]>([]);
