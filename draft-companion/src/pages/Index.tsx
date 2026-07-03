@@ -292,7 +292,7 @@ const Index = () => {
       setAnalysisState("analyzing");
 
       try {
-        const response = await fetch("http://localhost:5000/api/parse-url", {
+        const response = await fetch("http://localhost:5000/api/upload/parse-url", {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
