@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from "react";
 import { AlertTriangle, ChevronDown, ChevronUp, Scale, Check, BookOpen, X } from "lucide-react";
-import { mockSimilarClause, mockCompareWithLaw, RiskLevel, AnalyzedClause } from "@/data/mockAnalysis";
+import { mockSimilarClause, mockCompareWithLaw, type RiskLevel, type AnalyzedClause } from "@/features/ai-analysis/data/mockAnalysis";
 
 interface AnalysisDashboardProps {
   data: AnalyzedClause[];

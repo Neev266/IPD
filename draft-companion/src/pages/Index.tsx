@@ -1,31 +1,14 @@
-import Sidebar from "@/components/Sidebar";
-import DocumentEditor from "@/components/DocumentEditor";
-import AssistantPanel from "@/components/AssistantPanel";
-import AnalysisDashboard from "@/components/AnalysisDashboard";
-import UploadProcessingOverlay from "@/components/UploadProcessingOverlay";
-import NewDraftDialog from "@/components/NewDraftDialog";
+import Sidebar from "@/components/layout/Sidebar";
+import DocumentEditor from "@/features/document-editor/components/DocumentEditor";
+import AssistantPanel from "@/features/assistant/components/AssistantPanel";
+import AnalysisDashboard from "@/features/ai-analysis/components/AnalysisDashboard";
+import UploadProcessingOverlay from "@/features/upload/components/UploadProcessingOverlay";
+import NewDraftDialog from "@/features/drafts/components/NewDraftDialog";
 import { useState, useEffect, useCallback } from "react";
-import { generateMockAnalysis, AnalyzedClause } from "@/data/mockAnalysis";
+import { generateMockAnalysis, type AnalyzedClause } from "@/features/ai-analysis/data/mockAnalysis";
 import { UploadCloud, Settings2, Download, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
-
-export type AnalysisState = "idle" | "ready" | "analyzing" | "results";
-
-export interface Clause {
-  id: number;
-  title: string;
-  content: string;
-}
-
-export interface Draft {
-  id: string;
-  title: string;
-  subtitle: string;
-  date: string;
-  clauses?: Clause[];
-  rawHtml?: string;
-  cloudinaryUrl?: string;
-}
+import type { AnalysisState, Clause, Draft } from "@/types/document";
 
 /* ─── Analyzing Overlay Modal ─── */
 const analyzeSteps = [

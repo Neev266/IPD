@@ -1,6 +1,6 @@
 import { Lock, FileText, Clock, Settings, ChevronDown, ChevronRight, Users, Trash2 } from "lucide-react";
 import { useState } from "react";
-import nyayaLogo from "@/assets/nyaya-logo.png";
+import nyayaLogo from "@/assets/images/nyaya-logo.png";
 
 interface Draft {
   id: string;

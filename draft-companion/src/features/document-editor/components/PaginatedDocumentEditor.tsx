@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import type { Clause } from "@/pages/Index";
-import EditorToolbar from "./EditorToolbar";
+import type { Clause } from "@/types/document";
+import EditorToolbar from "@/features/document-editor/components/EditorToolbar";
 
 const PAGE_HEIGHT = 1344;
 const PAGE_PADDING_Y = 120;

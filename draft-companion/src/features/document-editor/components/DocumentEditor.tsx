@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from "react";
-import type { Clause } from "@/pages/Index";
-import EditorToolbar from "./EditorToolbar";
+import type { Clause } from "@/types/document";
+import EditorToolbar from "@/features/document-editor/components/EditorToolbar";
 
 // US Letter paper: 8.5" × 11" at 96 DPI
 const PAGE_WIDTH = 816;
