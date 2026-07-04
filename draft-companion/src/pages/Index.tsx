@@ -6,8 +6,10 @@ import UploadProcessingOverlay from "@/features/upload/components/UploadProcessi
 import NewDraftDialog from "@/features/drafts/components/NewDraftDialog";
 import { useState, useEffect, useCallback } from "react";
 import { generateMockAnalysis, type AnalyzedClause } from "@/features/ai-analysis/data/mockAnalysis";
+import { useAuth } from "@/features/auth/components/AuthProvider";
 import { UploadCloud, Settings2, Download, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { supabaseService } from "@/services/supabaseService";
 import type { AnalysisState, Clause, Draft } from "@/types/document";
 
 /* ─── Analyzing Overlay Modal ─── */
@@ -180,10 +182,8 @@ const initialDrafts: Draft[] = [
 
 /* ─── Page Component ─── */
 const Index = () => {
-  const [drafts, setDrafts] = useState<Draft[]>(() => {
-    const saved = localStorage.getItem("legal_drafts");
-    return saved ? JSON.parse(saved) : initialDrafts;
-  });
+  const { signOut, user } = useAuth();
+  const [drafts, setDrafts] = useState<Draft[]>(initialDrafts);
   const [activeDraft, setActiveDraft] = useState<string>(() => {
     const saved = localStorage.getItem("legal_active_draft");
     return saved || "2";
@@ -196,14 +196,46 @@ const Index = () => {
   const [showAnalyzingOverlay, setShowAnalyzingOverlay] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
 
-  // Sync to localStorage
   useEffect(() => {
-    localStorage.setItem("legal_drafts", JSON.stringify(drafts));
-  }, [drafts]);
+    const savedActive = localStorage.getItem("legal_active_draft");
+    if (savedActive) setActiveDraft(savedActive);
+  }, []);
 
   useEffect(() => {
     localStorage.setItem("legal_active_draft", activeDraft);
   }, [activeDraft]);
+
+  useEffect(() => {
+    const syncDraftsFromSupabase = async () => {
+      if (!user?.id) return;
+      try {
+        const remoteDrafts = await supabaseService.loadDrafts(user.id);
+        if (remoteDrafts.length > 0) {
+          setDrafts(remoteDrafts);
+          if (!activeDraft || !remoteDrafts.some((draft) => draft.id === activeDraft)) {
+            setActiveDraft(remoteDrafts[0].id);
+          }
+        }
+      } catch (error) {
+        console.error("Failed to load drafts from Supabase", error);
+      }
+    };
+
+    syncDraftsFromSupabase();
+  }, [user?.id]);
+
+  useEffect(() => {
+    const persistDraftsToSupabase = async () => {
+      if (!user?.id || drafts.length === 0) return;
+      try {
+        await supabaseService.saveDrafts(user.id, drafts);
+      } catch (error) {
+        console.error("Failed to persist drafts to Supabase", error);
+      }
+    };
+
+    persistDraftsToSupabase();
+  }, [drafts, user?.id]);
 
   // Derive active draft details
   const activeDraftObj = drafts.find((d) => d.id === activeDraft) || drafts[0];
@@ -529,6 +561,8 @@ const Index = () => {
           }}
           onNewDraftClick={() => setIsNewDraftOpen(true)}
           onDeleteDraft={handleDeleteDraft}
+          onSignOut={() => signOut()}
+          userEmail={user?.email}
         />
 
         <div className="flex-1 relative flex overflow-hidden">

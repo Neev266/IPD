@@ -1,4 +1,4 @@
-import { Lock, FileText, Clock, Settings, ChevronDown, ChevronRight, Users, Trash2 } from "lucide-react";
+import { Lock, FileText, Clock, Settings, ChevronDown, ChevronRight, Users, Trash2, LogOut } from "lucide-react";
 import { useState } from "react";
 import nyayaLogo from "@/assets/images/nyaya-logo.png";
 
@@ -15,9 +15,11 @@ interface SidebarProps {
   onSelectDraft: (id: string) => void;
   onNewDraftClick?: () => void;
   onDeleteDraft?: (id: string, e: React.MouseEvent) => void;
+  onSignOut?: () => void;
+  userEmail?: string;
 }
 
-const Sidebar = ({ drafts, activeDraft, onSelectDraft, onNewDraftClick, onDeleteDraft }: SidebarProps) => {
+const Sidebar = ({ drafts, activeDraft, onSelectDraft, onNewDraftClick, onDeleteDraft, onSignOut, userEmail }: SidebarProps) => {
   const [draftsOpen, setDraftsOpen] = useState(true);
   const [templatesOpen, setTemplatesOpen] = useState(false);
 
@@ -75,16 +77,29 @@ const Sidebar = ({ drafts, activeDraft, onSelectDraft, onNewDraftClick, onDelete
         <NavItem icon={<Settings size={18} />} label="Settings" />
       </div>
 
-      <div className="border-t border-border p-4 flex items-center gap-3">
-        <div className="w-10 h-10 rounded-full bg-muted overflow-hidden flex-shrink-0">
-          <div className="w-full h-full bg-gradient-to-br from-muted-foreground/30 to-muted-foreground/10" />
+      <div className="border-t border-[#d4cfc1]/60 p-3 space-y-2">
+        <div className="flex items-center gap-3 rounded-xl border border-[#d4cfc1]/70 bg-white/70 px-3 py-2.5 shadow-[0_2px_8px_rgba(0,0,0,0.03)]">
+          <div className="w-9 h-9 rounded-full bg-[#2a303a] text-white flex items-center justify-center text-sm font-semibold flex-shrink-0">
+            {userEmail ? userEmail.charAt(0).toUpperCase() : "U"}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="font-sans font-semibold text-sm text-[#222] truncate">
+              {userEmail || "Signed in"}
+            </p>
+            <p className="font-sans text-xs text-[#6f6a62] truncate">Workspace account</p>
+          </div>
         </div>
-        <div className="min-w-0">
-          <p className="font-sans font-semibold text-sm text-foreground truncate">Param Shah</p>
-          <p className="font-sans text-xs text-muted-foreground flex items-center gap-1">
-            Settings <ChevronDown size={12} />
-          </p>
-        </div>
+
+        {onSignOut && (
+          <button
+            type="button"
+            onClick={onSignOut}
+            className="flex w-full items-center justify-center gap-2 rounded-xl border border-[#d4cfc1]/70 bg-[#f4efe8] px-3 py-2.5 text-sm font-medium text-[#2f2a24] transition hover:bg-[#e9e1d3] hover:text-[#161412]"
+          >
+            <LogOut size={15} />
+            Sign out
+          </button>
+        )}
       </div>
     </div>
   );
