@@ -4,7 +4,8 @@ import { successResponse, errorResponse } from "../utils/response.js";
 export const getDocuments = async (req, res, next) => {
   console.log("DEBUG: getDocuments controller triggered.");
   try {
-    const resources = await listDocumentsFromCloudinary();
+    const userId = req.user?.id;
+    const resources = await listDocumentsFromCloudinary(userId);
     return successResponse(res, { resources }, "Documents fetched successfully");
   } catch (err) {
     next(err);
@@ -17,6 +18,20 @@ export const deleteDocument = async (req, res, next) => {
 
   if (!publicId) {
     return errorResponse(res, "Missing publicId parameter.", null, 400);
+  }
+
+  if (publicId.startsWith("local-file://")) {
+    try {
+      const result = await deleteFromCloudinary(publicId);
+      return successResponse(res, { result }, "Document deleted successfully");
+    } catch (err) {
+      return next(err);
+    }
+  }
+
+  const userId = req.user?.id;
+  if (userId && !publicId.startsWith(`Documents/${userId}/`)) {
+    return errorResponse(res, "Unauthorized deletion attempt.", null, 403);
   }
 
   try {

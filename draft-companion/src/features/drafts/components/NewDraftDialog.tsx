@@ -9,6 +9,7 @@ import {
 import { UploadCloud, FileText, FileCode, ArrowLeft, Loader2, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
+import { supabase } from "@/lib/supabase";
 
 interface NewDraftDialogProps {
   isOpen: boolean;
@@ -66,12 +67,6 @@ export default function NewDraftDialog({
   };
 
   const processFileUpload = async (file: File) => {
-    const extension = file.name.split(".").pop()?.toLowerCase();
-    if (extension !== "pdf" && extension !== "docx") {
-      toast.error("Invalid file format. Only PDF and Word (.docx) documents are supported.");
-      return;
-    }
-
     setIsUploading(true);
     setErrorMsg(null);
     setUploadStep("Connecting to conversion server...");
@@ -89,12 +84,22 @@ export default function NewDraftDialog({
         setUploadStep(
           file.type === "application/pdf"
             ? "Converting PDF to editable document format..."
-            : "Parsing Word document structures..."
+            : file.name.toLowerCase().endsWith(".docx")
+            ? "Parsing Word document structures..."
+            : "Processing file content..."
         );
       }, 2000);
 
+      const session = (await supabase.auth.getSession()).data.session;
+      const token = session?.access_token;
+      const headers: HeadersInit = {};
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
       const response = await fetch("http://localhost:5000/api/upload", {
         method: "POST",
+        headers,
         body: formData,
       });
 
@@ -153,7 +158,7 @@ export default function NewDraftDialog({
           <DialogDescription className="font-sans text-[13px] text-[#666]">
             {mode === "choice"
               ? "Start drafting from scratch or import an existing document to make it editable."
-              : "Upload a PDF or Word (.docx) file. We'll upload it to Cloudinary and convert it."}
+              : "Upload any document or file. PDFs/DOCXs will be converted to editable formats; others will show a download link."}
           </DialogDescription>
         </DialogHeader>
 
@@ -197,7 +202,7 @@ export default function NewDraftDialog({
                   Import Document
                 </h3>
                 <p className="font-sans text-[11px] text-[#888] leading-relaxed">
-                  Upload PDF/Word to edit and store on Cloudinary
+                  Upload any file to store on Cloudinary and view
                 </p>
               </button>
             </motion.div>
@@ -237,7 +242,7 @@ export default function NewDraftDialog({
                   type="file"
                   ref={fileInputRef}
                   onChange={handleFileChange}
-                  accept=".pdf,.docx"
+                  accept="*"
                   className="hidden"
                   disabled={isUploading}
                 />
@@ -285,15 +290,15 @@ export default function NewDraftDialog({
                         Drag and drop your file here
                       </p>
                       <p className="font-sans text-xs text-[#888] mt-1">
-                        or click to browse from files (PDF or DOCX)
+                        or click to browse files
                       </p>
                     </div>
                     <div className="flex justify-center gap-4 text-[10px] font-sans font-semibold tracking-wider text-[#999] uppercase pt-2">
                       <span className="flex items-center gap-1">
-                        <FileCode size={12} /> PDF Document
+                        <FileCode size={12} /> PDF / DOCX
                       </span>
                       <span className="flex items-center gap-1">
-                        <FileText size={12} /> Word .docx
+                        <FileText size={12} /> Images / Other files
                       </span>
                     </div>
                   </div>

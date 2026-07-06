@@ -12,11 +12,13 @@ export const uploadFile = async (req, res, next) => {
     const { originalname, buffer, mimetype } = req.file;
     console.log(`DEBUG: Received file: ${originalname}, MimeType: ${mimetype}, Size: ${buffer.length} bytes`);
 
+    const userId = req.user?.id;
+
     // 1. Upload to Cloudinary
     let cloudinaryResult;
     try {
       console.log("DEBUG: Attempting upload to Cloudinary...");
-      cloudinaryResult = await uploadToCloudinary(buffer, originalname);
+      cloudinaryResult = await uploadToCloudinary(buffer, originalname, userId);
       console.log("DEBUG: Cloudinary Upload Result URL:", cloudinaryResult.secure_url);
     } catch (uploadError) {
       console.error("DEBUG: Cloudinary upload failed:", uploadError);
@@ -24,7 +26,7 @@ export const uploadFile = async (req, res, next) => {
     }
 
     // 2. Parse document text to editable HTML
-    const parsedHtml = await parseFileToHtml(buffer, originalname, mimetype);
+    const parsedHtml = await parseFileToHtml(buffer, originalname, mimetype, cloudinaryResult.secure_url);
     console.log("DEBUG: Document parsed to HTML successfully.");
 
     return successResponse(res, {
@@ -57,7 +59,7 @@ export const parseRemoteUrl = async (req, res, next) => {
     const buffer = Buffer.from(arrayBuffer);
     
     // Parse
-    const parsedHtml = await parseFileToHtml(buffer, fileName, "");
+    const parsedHtml = await parseFileToHtml(buffer, fileName, "", url);
     console.log("DEBUG: Remote document parsed successfully.");
 
     return successResponse(res, { html: parsedHtml }, "Remote document parsed successfully");

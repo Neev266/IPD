@@ -1,7 +1,7 @@
 import cloudinary from "../config/cloudinary.js";
 import { isCloudinaryConfigured } from "../config/env.js";
 
-export const uploadToCloudinary = (fileBuffer, fileName) => {
+export const uploadToCloudinary = (fileBuffer, fileName, userId) => {
   return new Promise((resolve, reject) => {
     console.log(`DEBUG: uploadToCloudinary service started for: ${fileName}`);
     
@@ -10,10 +10,12 @@ export const uploadToCloudinary = (fileBuffer, fileName) => {
       return resolve({ secure_url: `local-file://${fileName}`, public_id: `local-file://${fileName}` });
     }
 
+    const folder = userId ? `Documents/${userId}` : "Documents";
+
     const uploadStream = cloudinary.uploader.upload_stream(
       {
         resource_type: "raw",
-        folder: "Documents",
+        folder: folder,
         public_id: `${Date.now()}_${fileName.replace(/\s+/g, "_")}`,
       },
       (error, result) => {
@@ -51,7 +53,7 @@ export const deleteFromCloudinary = async (publicId) => {
   return result;
 };
 
-export const listDocumentsFromCloudinary = async () => {
+export const listDocumentsFromCloudinary = async (userId) => {
   console.log("DEBUG: listDocumentsFromCloudinary service started.");
   
   if (!isCloudinaryConfigured) {
@@ -59,10 +61,12 @@ export const listDocumentsFromCloudinary = async () => {
     return [];
   }
 
+  const prefix = userId ? `Documents/${userId}/` : "Documents/";
+
   const result = await cloudinary.api.resources({
     resource_type: "raw",
     type: "upload",
-    prefix: "Documents/",
+    prefix: prefix,
     max_results: 100,
   });
 

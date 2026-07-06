@@ -10,6 +10,7 @@ import { useAuth } from "@/features/auth/components/AuthProvider";
 import { UploadCloud, Settings2, Download, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabaseService } from "@/services/supabaseService";
+import { supabase } from "@/lib/supabase";
 import type { AnalysisState, Clause, Draft } from "@/types/document";
 
 /* ─── Analyzing Overlay Modal ─── */
@@ -246,7 +247,13 @@ const Index = () => {
       setIsSyncing(true);
       try {
         console.log("DEBUG: Syncing drafts with Cloudinary folder 'Documents'...");
-        const response = await fetch("http://localhost:5000/api/documents");
+        const session = (await supabase.auth.getSession()).data.session;
+        const token = session?.access_token;
+        const headers: HeadersInit = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+        const response = await fetch("http://localhost:5000/api/documents", { headers });
         if (!response.ok) throw new Error("Failed to list remote documents");
         
         const data = await response.json();
@@ -273,7 +280,10 @@ const Index = () => {
               newDraftsToAdd.push({
                 id: remote.cloudinaryPublicId, // Use public_id as unique ID
                 title: remote.fileName,
-                subtitle: remote.fileName.endsWith(".pdf") ? "Imported PDF" : "Imported Word",
+                subtitle: (() => {
+                  const ext = remote.fileName.split(".").pop()?.toUpperCase() || "File";
+                  return `Imported ${ext}`;
+                })(),
                 date: remote.date,
                 rawHtml: "", // Empty rawHtml triggers on-demand parsing when selected
                 cloudinaryUrl: remote.cloudinaryUrl,
@@ -307,11 +317,18 @@ const Index = () => {
       setAnalysisState("analyzing");
 
       try {
+        const session = (await supabase.auth.getSession()).data.session;
+        const token = session?.access_token;
+        const headers: HeadersInit = {
+          "Content-Type": "application/json",
+        };
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
         const response = await fetch("http://localhost:5000/api/upload/parse-url", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers,
           body: JSON.stringify({
             url: activeObj.cloudinaryUrl,
             fileName: activeObj.title + (activeObj.subtitle.includes("PDF") ? ".pdf" : ".docx"),
@@ -438,7 +455,10 @@ const Index = () => {
     const newDraft: Draft = {
       id: newId,
       title: cleanName,
-      subtitle: fileName.endsWith(".pdf") ? "Imported PDF" : "Imported Word",
+      subtitle: (() => {
+        const ext = fileName.split(".").pop()?.toUpperCase() || "File";
+        return `Imported ${ext}`;
+      })(),
       date: "Just Now",
       rawHtml: parsedHtml,
       cloudinaryUrl: cloudinaryUrl,
@@ -462,12 +482,24 @@ const Index = () => {
     if (draftToDelete.cloudinaryPublicId) {
       try {
         console.log(`Deleting remote asset from Cloudinary: ${draftToDelete.cloudinaryPublicId}`);
-        fetch(`http://localhost:5000/api/documents?publicId=${encodeURIComponent(draftToDelete.cloudinaryPublicId)}`, {
-          method: "DELETE",
-        })
-          .then((res) => res.json())
-          .then((data) => console.log("Cloudinary asset deletion response:", data))
-          .catch((err) => console.error("Failed to delete asset from Cloudinary:", err));
+        
+        supabase.auth.getSession().then(({ data: { session } }) => {
+          const token = session?.access_token;
+          const headers: HeadersInit = {};
+          if (token) {
+            headers["Authorization"] = `Bearer ${token}`;
+          }
+          
+          fetch(`http://localhost:5000/api/documents?publicId=${encodeURIComponent(draftToDelete.cloudinaryPublicId!)}`, {
+            method: "DELETE",
+            headers,
+          })
+            .then((res) => res.json())
+            .then((data) => console.log("Cloudinary asset deletion response:", data))
+            .catch((err) => console.error("Failed to delete asset from Cloudinary:", err));
+        }).catch((err) => {
+          console.error("Auth session retrieval failed for deletion:", err);
+        });
       } catch (err) {
         console.error("Cloudinary delete error:", err);
       }
