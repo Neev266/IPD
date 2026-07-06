@@ -1,4 +1,5 @@
-import { supabase } from "../config/supabase.js";
+import jwt from "jsonwebtoken";
+import { env } from "../config/env.js";
 
 export const authMiddleware = async (req, res, next) => {
   try {
@@ -14,14 +15,13 @@ export const authMiddleware = async (req, res, next) => {
     }
 
     const token = authHeader.split(" ")[1];
-    const { data: { user }, error } = await supabase.auth.getUser(token);
-
-    if (error || !user) {
-      return res.status(401).json({ error: "Unauthorized access: " + (error?.message || "Invalid token") });
+    try {
+      const decoded = jwt.verify(token, env.JWT_SECRET);
+      req.user = decoded; // Contains id and email
+      next();
+    } catch (err) {
+      return res.status(401).json({ error: "Unauthorized access: Invalid or expired token" });
     }
-
-    req.user = user;
-    next();
   } catch (err) {
     next(err);
   }

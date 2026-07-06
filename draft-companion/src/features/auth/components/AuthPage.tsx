@@ -3,12 +3,13 @@ import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { supabase } from "@/lib/supabase";
+import { useAuth } from "./AuthProvider";
 
 type Mode = "sign-in" | "sign-up";
 
 const AuthPage = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
   const navigate = useNavigate();
+  const { signIn, signUp } = useAuth();
   const [mode, setMode] = useState<Mode>("sign-in");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -26,17 +27,20 @@ const AuthPage = ({ isAuthenticated }: { isAuthenticated: boolean }) => {
     setLoading(true);
     setMessage("");
 
-    const { error } =
+    const result =
       mode === "sign-in"
-        ? await supabase.auth.signInWithPassword({ email, password })
-        : await supabase.auth.signUp({ email, password });
+        ? await signIn(email, password)
+        : await signUp(email, password);
 
-    if (error) {
-      setMessage(error.message);
+    if (result.error) {
+      setMessage(result.error);
     } else {
-      setMessage(mode === "sign-in" ? "Signed in successfully." : "Check your inbox to confirm your account.");
+      setMessage(mode === "sign-in" ? "Signed in successfully." : "Registered successfully.");
       if (mode === "sign-in") {
         navigate("/", { replace: true });
+      } else {
+        // Automatically switch to sign-in after successful sign up
+        setMode("sign-in");
       }
     }
 

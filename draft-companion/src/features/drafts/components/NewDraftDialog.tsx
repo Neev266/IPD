@@ -90,8 +90,7 @@ export default function NewDraftDialog({
         );
       }, 2000);
 
-      const session = (await supabase.auth.getSession()).data.session;
-      const token = session?.access_token;
+      const token = localStorage.getItem("token");
       const headers: HeadersInit = {};
       if (token) {
         headers["Authorization"] = `Bearer ${token}`;

@@ -1,25 +1,49 @@
-import { supabase } from "@/lib/supabase";
 import type { Draft } from "@/types/document";
 
 export const supabaseService = {
   async saveDrafts(userId: string, drafts: Draft[]) {
     if (!drafts.length) return [];
 
-    const rows = drafts.map((draft) => ({
-      id: draft.id,
-      user_id: userId,
-      payload: draft,
-      created_at: new Date().toISOString(),
-    }));
+    const token = localStorage.getItem("token");
+    const headers: HeadersInit = {
+      "Content-Type": "application/json",
+    };
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
 
-    const { data, error } = await supabase.from("drafts").upsert(rows, { onConflict: "id" }).select();
-    if (error) throw error;
-    return data ?? [];
+    const response = await fetch("http://localhost:5000/api/supabase/drafts", {
+      method: "POST",
+      headers,
+      body: JSON.stringify({ drafts }),
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to save drafts to backend");
+    }
+
+    const data = await response.json();
+    return data.drafts ?? [];
   },
 
   async loadDrafts(userId: string) {
-    const { data, error } = await supabase.from("drafts").select("*").eq("user_id", userId).order("created_at", { ascending: false });
-    if (error) throw error;
-    return (data ?? []).map((row: any) => row.payload as Draft);
+    const token = localStorage.getItem("token");
+    const headers: HeadersInit = {};
+    if (token) {
+      headers["Authorization"] = `Bearer ${token}`;
+    }
+
+    const response = await fetch("http://localhost:5000/api/supabase/drafts", {
+      headers,
+    });
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.error || "Failed to load drafts from backend");
+    }
+
+    const data = await response.json();
+    return (data.drafts ?? []).map((row: any) => row.payload as Draft);
   },
 };

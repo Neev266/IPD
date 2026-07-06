@@ -29,6 +29,7 @@ export const env = {
   SUPABASE_URL: process.env.SUPABASE_URL,
   SUPABASE_ANON_KEY: process.env.SUPABASE_ANON_KEY,
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  JWT_SECRET: process.env.JWT_SECRET || "super_secret_for_ipd_draft_companion_app",
   NODE_ENV: process.env.NODE_ENV || "development",
 };
 
