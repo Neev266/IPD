@@ -3,7 +3,20 @@ import { parseDocxToHtml } from "./docx_service.js";
 
 export const parseFileToHtml = async (buffer, originalName, mimeType, cloudinaryUrl) => {
   console.log(`DEBUG: Parser coordinating logic for: ${originalName}`);
+
   const extension = originalName.split(".").pop().toLowerCase();
+
+  // Check if buffer is already HTML or overwritten HTML (originally docx/pdf but overwritten with html)
+  const isZip = buffer[0] === 0x50 && buffer[1] === 0x4b && buffer[2] === 0x03 && buffer[3] === 0x04;
+  const isPdf = buffer[0] === 0x25 && buffer[1] === 0x50 && buffer[2] === 0x44 && buffer[3] === 0x46;
+  const isOverwrittenHtml = (extension === "docx" && !isZip) || (extension === "pdf" && !isPdf);
+  const headStr = buffer.slice(0, 100).toString("utf-8").trim();
+  const isHtml = headStr.startsWith("<") || headStr.toLowerCase().startsWith("<!doctype") || isOverwrittenHtml;
+
+  if (isHtml) {
+    console.log("DEBUG: File buffer is HTML. Returning directly.");
+    return buffer.toString("utf-8");
+  }
 
   if (extension === "pdf" || mimeType === "application/pdf") {
     return await parsePdfToHtml(buffer, originalName);

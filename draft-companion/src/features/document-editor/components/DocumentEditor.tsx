@@ -217,6 +217,9 @@ export const DocumentEditor = ({
   onAddClause,
   focusedClauseId,
   initialHtml,
+  onChange,
+  onSave,
+  isSaving,
 }: any) => {
   const [drafting, setDrafting] = useState(false);
   const [newTitle, setNewTitle] = useState("");
@@ -407,7 +410,7 @@ export const DocumentEditor = ({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#eceae1]/50 overflow-hidden relative">
-      <EditorToolbar />
+      <EditorToolbar onSave={onSave} isSaving={isSaving} />
       <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col items-center py-12 relative">
         {/* ── Pages ── */}
         {pages.map((page, i) => (

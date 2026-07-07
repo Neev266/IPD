@@ -89,3 +89,32 @@ export const listDocumentsFromCloudinary = async (userId) => {
     };
   });
 };
+
+export const saveDocumentToCloudinary = (htmlContent, publicId) => {
+  return new Promise((resolve, reject) => {
+    console.log(`DEBUG: saveDocumentToCloudinary service started for: ${publicId}`);
+
+    if (!isCloudinaryConfigured) {
+      console.warn("DEBUG: Cloudinary not configured. Cannot save.");
+      return resolve({ secure_url: `local-file://${publicId}`, public_id: publicId });
+    }
+
+    const uploadStream = cloudinary.uploader.upload_stream(
+      {
+        resource_type: "raw",
+        public_id: publicId,
+        overwrite: true,
+      },
+      (error, result) => {
+        if (error) {
+          console.error("DEBUG: Cloudinary raw stream save failed:", error);
+          return reject(error);
+        }
+        console.log("DEBUG: Cloudinary raw save succeeded:", result.secure_url);
+        resolve(result);
+      }
+    );
+
+    uploadStream.end(Buffer.from(htmlContent, "utf-8"));
+  });
+};

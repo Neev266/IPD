@@ -2,6 +2,7 @@ import { supabase } from "../config/supabase.js";
 import bcrypt from "bcryptjs";
 import jwt from "jsonwebtoken";
 import { env } from "../config/env.js";
+import { User } from "../models/user_model.js";
 
 export const hashPassword = async (password) => {
   const salt = await bcrypt.genSalt(10);
@@ -29,7 +30,10 @@ export const findUserByEmail = async (email) => {
     console.error("Error finding user by email:", error);
     throw error;
   }
-  return data;
+  if (!data) return null;
+  const user = new User(data.id, data.email, data.name);
+  user.password = data.password;
+  return user;
 };
 
 export const registerUser = async (email, password) => {
@@ -55,5 +59,8 @@ export const registerUser = async (email, password) => {
     throw error;
   }
 
-  return data[0];
+  const dbUser = data[0];
+  const user = new User(dbUser.id, dbUser.email, dbUser.name);
+  user.password = dbUser.password;
+  return user;
 };

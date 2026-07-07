@@ -1,7 +1,7 @@
 import {
   Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Type, Highlighter, ChevronDown, Download, FileType, FileText as FileTextIcon,
-  Undo, Redo, Minus, Plus
+  Undo, Redo, Minus, Plus, Save
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -52,7 +52,7 @@ const ToolbarButton = ({
 
 const ToolbarDivider = () => <div className="w-px h-5 bg-[#d4cfc1] mx-1.5" />;
 
-const EditorToolbar = () => {
+const EditorToolbar = ({ onSave, isSaving }: { onSave?: () => void; isSaving?: boolean }) => {
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   const [isFontOpen, setIsFontOpen] = useState(false);
   const [isSizeOpen, setIsSizeOpen] = useState(false);
@@ -319,6 +319,18 @@ const EditorToolbar = () => {
       </div>
 
       <div className="flex-1" />
+
+      {/* Save Button */}
+      {onSave && (
+        <button
+          onClick={onSave}
+          disabled={isSaving}
+          className={`p-2 rounded-full transition-all duration-300 text-[#555] hover:bg-[#1a202c] hover:text-white hover:shadow-md ${isSaving ? 'opacity-50 cursor-not-allowed' : ''}`}
+          title={isSaving ? "Saving..." : "Save Document"}
+        >
+          <Save size={18} className={isSaving ? "animate-spin" : ""} />
+        </button>
+      )}
 
       {/* Download Button */}
       <div className="relative" ref={downloadRef}>

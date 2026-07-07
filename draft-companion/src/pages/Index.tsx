@@ -11,6 +11,7 @@ import { UploadCloud, Settings2, Download, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabaseService } from "@/services/supabaseService";
 import type { AnalysisState, Clause, Draft } from "@/types/document";
+import { toast } from "sonner";
 
 /* ─── Analyzing Overlay Modal ─── */
 const analyzeSteps = [
@@ -194,6 +195,7 @@ const Index = () => {
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [showAnalyzingOverlay, setShowAnalyzingOverlay] = useState(false);
   const [isSyncing, setIsSyncing] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     const savedActive = localStorage.getItem("legal_active_draft");
@@ -205,27 +207,93 @@ const Index = () => {
   }, [activeDraft]);
 
   useEffect(() => {
-    const syncDraftsFromSupabase = async () => {
+    const syncAllData = async () => {
       if (!user?.id) return;
+      setIsSyncing(true);
+      
+      let baseDrafts = initialDrafts;
+
       try {
-        const remoteDrafts = await supabaseService.loadDrafts(user.id);
-        if (remoteDrafts.length > 0) {
-          setDrafts(remoteDrafts);
-          if (!activeDraft || !remoteDrafts.some((draft) => draft.id === activeDraft)) {
-            setActiveDraft(remoteDrafts[0].id);
-          }
+        console.log("DEBUG: Loading drafts from Supabase...");
+        const dbDrafts = await supabaseService.loadDrafts(user.id);
+        if (dbDrafts.length > 0) {
+          baseDrafts = dbDrafts;
         }
       } catch (error) {
         console.error("Failed to load drafts from Supabase", error);
       }
+
+      try {
+        console.log("DEBUG: Syncing drafts with Cloudinary folder...");
+        const token = localStorage.getItem("token");
+        const headers: HeadersInit = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+        
+        const response = await fetch("http://localhost:5000/api/documents", { headers });
+        if (!response.ok) throw new Error("Failed to list remote documents");
+        
+        const data = await response.json();
+        const remoteFiles = data.resources || [];
+        console.log("DEBUG: Active remote files listed from Cloudinary:", remoteFiles);
+
+        // Filter out drafts that exist locally in baseDrafts but have been deleted on Cloudinary
+        const cleanedDrafts = baseDrafts.filter((localDraft) => {
+          if (!localDraft.cloudinaryPublicId) return true; // Keep custom drafts / blank drafts
+          const existsOnRemote = remoteFiles.some(
+            (remote: any) => remote.cloudinaryPublicId === localDraft.cloudinaryPublicId
+          );
+          return existsOnRemote;
+        });
+
+        // Identify files on Cloudinary that are missing in the drafts list
+        const newDraftsToAdd: Draft[] = [];
+        remoteFiles.forEach((remote: any) => {
+          const alreadyExists = cleanedDrafts.some(
+            (localDraft) => localDraft.cloudinaryPublicId === remote.cloudinaryPublicId
+          );
+          if (!alreadyExists) {
+            newDraftsToAdd.push({
+              id: remote.cloudinaryPublicId, // Use public_id as unique ID
+              title: remote.fileName,
+              subtitle: (() => {
+                const ext = remote.fileName.split(".").pop()?.toUpperCase() || "File";
+                return `Imported ${ext}`;
+              })(),
+              date: remote.date,
+              rawHtml: "", // Empty rawHtml triggers on-demand parsing when selected
+              cloudinaryUrl: remote.cloudinaryUrl,
+              cloudinaryPublicId: remote.cloudinaryPublicId,
+              clauses: [],
+            });
+          }
+        });
+
+        const finalMerged = [...cleanedDrafts, ...newDraftsToAdd];
+        setDrafts(finalMerged);
+        
+        // Auto-select active draft
+        if (finalMerged.length > 0) {
+          if (!activeDraft || !finalMerged.some((draft) => draft.id === activeDraft)) {
+            setActiveDraft(finalMerged[0].id);
+          }
+        }
+      } catch (err) {
+        console.error("DEBUG: Cloudinary synchronization failed:", err);
+        // Fall back to displaying whatever we successfully retrieved from Supabase
+        setDrafts(baseDrafts);
+      } finally {
+        setIsSyncing(false);
+      }
     };
 
-    syncDraftsFromSupabase();
+    syncAllData();
   }, [user?.id]);
 
   useEffect(() => {
     const persistDraftsToSupabase = async () => {
-      if (!user?.id || drafts.length === 0) return;
+      if (!user?.id || drafts.length === 0 || isSyncing) return;
       try {
         await supabaseService.saveDrafts(user.id, drafts);
       } catch (error) {
@@ -234,65 +302,12 @@ const Index = () => {
     };
 
     persistDraftsToSupabase();
-  }, [drafts, user?.id]);
+  }, [drafts, user?.id, isSyncing]);
 
   // Derive active draft details
   const activeDraftObj = drafts.find((d) => d.id === activeDraft) || drafts[0];
 
-  // 1. Sync drafts with active Cloudinary files on mount
-  useEffect(() => {
-    const syncCloudinaryDrafts = async () => {
-      setIsSyncing(true);
-      try {
-        console.log("DEBUG: Syncing drafts with Cloudinary folder 'Documents'...");
-        const response = await fetch("http://localhost:5000/api/documents");
-        if (!response.ok) throw new Error("Failed to list remote documents");
-
-        const data = await response.json();
-        const remoteFiles = data.resources || [];
-        console.log("DEBUG: Active remote files listed from Cloudinary:", remoteFiles);
-
-        setDrafts((prevDrafts) => {
-          // Identify drafts that exist locally but have been deleted on Cloudinary (Vice Versa Sync)
-          const cleanedDrafts = prevDrafts.filter((localDraft) => {
-            if (!localDraft.cloudinaryPublicId) return true; // keep mock / blank drafts
-            const existsOnRemote = remoteFiles.some(
-              (remote: any) => remote.cloudinaryPublicId === localDraft.cloudinaryPublicId
-            );
-            return existsOnRemote;
-          });
-
-          // Identify files that exist on Cloudinary but are missing locally
-          const newDraftsToAdd: Draft[] = [];
-          remoteFiles.forEach((remote: any) => {
-            const alreadyExists = cleanedDrafts.some(
-              (localDraft) => localDraft.cloudinaryPublicId === remote.cloudinaryPublicId
-            );
-            if (!alreadyExists) {
-              newDraftsToAdd.push({
-                id: remote.cloudinaryPublicId, // Use public_id as unique ID
-                title: remote.fileName,
-                subtitle: remote.fileName.endsWith(".pdf") ? "Imported PDF" : "Imported Word",
-                date: remote.date,
-                rawHtml: "", // Empty rawHtml triggers on-demand parsing when selected
-                cloudinaryUrl: remote.cloudinaryUrl,
-                cloudinaryPublicId: remote.cloudinaryPublicId,
-                clauses: [],
-              });
-            }
-          });
-
-          return [...cleanedDrafts, ...newDraftsToAdd];
-        });
-      } catch (err) {
-        console.error("DEBUG: Cloudinary synchronization failed:", err);
-      } finally {
-        setIsSyncing(false);
-      }
-    };
-
-    syncCloudinaryDrafts();
-  }, []);
+  // 1. Sync drafts with active Cloudinary files on mount (integrated into syncAllData sequence above)
 
   // 2. Load and parse content on-demand for newly synced Cloudinary documents
   useEffect(() => {
@@ -306,11 +321,17 @@ const Index = () => {
       setAnalysisState("analyzing");
 
       try {
+        const token = localStorage.getItem("token");
+        const headers: HeadersInit = {
+          "Content-Type": "application/json",
+        };
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
+
         const response = await fetch("http://localhost:5000/api/upload/parse-url", {
           method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
+          headers,
           body: JSON.stringify({
             url: activeObj.cloudinaryUrl,
             fileName: activeObj.title + (activeObj.subtitle.includes("PDF") ? ".pdf" : ".docx"),
@@ -448,6 +469,46 @@ const Index = () => {
     setActiveDraft(newId);
   };
 
+  const handleSaveDocument = async () => {
+    const activeObj = drafts.find((d) => d.id === activeDraft);
+    if (!activeObj || !activeObj.cloudinaryPublicId) {
+      toast.error("No active remote document to save.");
+      return;
+    }
+
+    setIsSaving(true);
+    try {
+      console.log(`DEBUG: Saving document back to Cloudinary: ${activeObj.cloudinaryPublicId}`);
+      const token = localStorage.getItem("token");
+      const headers: HeadersInit = {
+        "Content-Type": "application/json",
+      };
+      if (token) {
+        headers["Authorization"] = `Bearer ${token}`;
+      }
+
+      const response = await fetch("http://localhost:5000/api/documents/save", {
+        method: "POST",
+        headers,
+        body: JSON.stringify({
+          publicId: activeObj.cloudinaryPublicId,
+          html: activeObj.rawHtml,
+        }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Failed to save document to Cloudinary");
+      }
+
+      toast.success("Document saved successfully to Cloudinary!");
+    } catch (err: any) {
+      console.error("Save error:", err);
+      toast.error(err.message || "Failed to save document");
+    } finally {
+      setIsSaving(false);
+    }
+  };
+
   const handleDeleteDraft = useCallback(async (id: string, e: React.MouseEvent) => {
     e.stopPropagation(); // Prevent selecting draft when deleting
 
@@ -461,8 +522,14 @@ const Index = () => {
     if (draftToDelete.cloudinaryPublicId) {
       try {
         console.log(`Deleting remote asset from Cloudinary: ${draftToDelete.cloudinaryPublicId}`);
+        const token = localStorage.getItem("token");
+        const headers: HeadersInit = {};
+        if (token) {
+          headers["Authorization"] = `Bearer ${token}`;
+        }
         fetch(`http://localhost:5000/api/documents?publicId=${encodeURIComponent(draftToDelete.cloudinaryPublicId)}`, {
           method: "DELETE",
+          headers,
         })
           .then((res) => res.json())
           .then((data) => console.log("Cloudinary asset deletion response:", data))
@@ -597,6 +664,13 @@ const Index = () => {
               initialHtml={activeDraftObj?.rawHtml}
               onAddClause={handleAddClause}
               focusedClauseId={focusedClauseId}
+              onChange={(newHtml: string) => {
+                setDrafts((prev) =>
+                  prev.map((d) => (d.id === activeDraft ? { ...d, rawHtml: newHtml } : d))
+                );
+              }}
+              onSave={handleSaveDocument}
+              isSaving={isSaving}
             />
           </motion.div>
 
