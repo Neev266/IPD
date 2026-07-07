@@ -31,6 +31,7 @@ export const env = {
   SUPABASE_SERVICE_ROLE_KEY: process.env.SUPABASE_SERVICE_ROLE_KEY,
   JWT_SECRET: process.env.JWT_SECRET || "super_secret_for_ipd_draft_companion_app",
   NODE_ENV: process.env.NODE_ENV || "development",
+  GEMINI_API_KEY: process.env.GEMINI_API_KEY,
 };
 
 // Simple configuration checker

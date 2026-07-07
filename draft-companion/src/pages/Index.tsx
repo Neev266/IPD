@@ -346,6 +346,27 @@ const Index = () => {
             prev.map((d) => (d.id === activeDraft ? { ...d, rawHtml: data.html } : d))
           );
           console.log(`DEBUG: On-demand parsing succeeded and saved for: ${activeObj.title}`);
+          
+          // Trigger background vector database ingestion
+          try {
+            fetch("http://localhost:5000/api/pipeline/ingest", {
+              method: "POST",
+              headers,
+              body: JSON.stringify({
+                documentName: activeObj.title,
+                html: data.html,
+              }),
+            })
+              .then((res) => res.json())
+              .then((ingestData) => {
+                if (ingestData.success) {
+                  console.log(`DEBUG: Initial pgvector ingestion succeeded. Chunks: ${ingestData.chunkCount}`);
+                }
+              })
+              .catch((err) => console.error("DEBUG: Initial pgvector ingestion failed:", err));
+          } catch (err) {
+            console.error("DEBUG: Ingest trigger failure:", err);
+          }
         }
       } catch (err: any) {
         console.error("DEBUG: On-demand parsing failed:", err);
@@ -501,6 +522,31 @@ const Index = () => {
       }
 
       toast.success("Document saved successfully to Cloudinary!");
+
+      // Trigger pgvector ingestion on save
+      try {
+        console.log(`DEBUG: Automatically starting pgvector ingestion for save updates: "${activeObj.title}"`);
+        fetch("http://localhost:5000/api/pipeline/ingest", {
+          method: "POST",
+          headers,
+          body: JSON.stringify({
+            documentName: activeObj.title,
+            html: activeObj.rawHtml,
+          }),
+        })
+          .then((res) => res.json())
+          .then((data) => {
+            if (data.success) {
+              console.log(`DEBUG: Save ingestion succeeded. ID: ${data.documentId}, chunks: ${data.chunkCount}`);
+              toast.success("Semantic search index updated!");
+            } else {
+              console.error("DEBUG: Save ingestion returned failure:", data.error);
+            }
+          })
+          .catch((err) => console.error("DEBUG: Save ingestion request failed:", err));
+      } catch (ingestErr) {
+        console.error("DEBUG: Save ingestion coordinate error:", ingestErr);
+      }
     } catch (err: any) {
       console.error("Save error:", err);
       toast.error(err.message || "Failed to save document");

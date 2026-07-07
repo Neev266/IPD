@@ -4,6 +4,7 @@ import documentRoutes from "./document_routes.js";
 import analysisRoutes from "./analysis_routes.js";
 import supabaseRoutes from "./supabase_routes.js";
 import authRoutes from "./auth_routes.js";
+import pipelineRoutes from "./pipeline_routes.js";
 
 const router = Router();
 
@@ -13,5 +14,6 @@ router.use("/upload", uploadRoutes);
 router.use("/documents", documentRoutes);
 router.use("/analysis", analysisRoutes);
 router.use("/supabase", supabaseRoutes);
+router.use("/pipeline", pipelineRoutes);
 
 export default router;
