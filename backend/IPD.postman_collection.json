@@ -1,0 +1,538 @@
+{
+  "info": {
+    "_postman_id": "034b9121-a531-4bde-89a6-15e90450198a",
+    "name": "IPD",
+    "description": "Full-stack document ingestion, analysis, and management API built with Express.js and Supabase. Covers authentication, file upload, document CRUD, semantic search pipeline, analysis, and Supabase health/draft management.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "56417058",
+    "_collection_link": "https://go.postman.co/collection/56417058-034b9121-a531-4bde-89a6-15e90450198a?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Auth",
+      "item": [
+        {
+          "name": "Signup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200 || pm.response.code === 201) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.token) pm.collectionVariables.set('token', json.token);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"yourpassword\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/signup",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "signup"
+              ]
+            },
+            "description": "Register a new user account. Provide an email and password. On success, a JWT token and user profile are returned. The test script automatically saves the token to the `token` collection variable."
+          },
+          "response": []
+        },
+        {
+          "name": "Login",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "  const json = pm.response.json();",
+                  "  if (json.token) pm.collectionVariables.set('token', json.token);",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"user@example.com\",\n  \"password\": \"yourpassword\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Authenticate an existing user. Provide email and password. Returns a JWT token on success. The test script automatically saves the token to the `token` collection variable for use in subsequent protected requests."
+          },
+          "response": []
+        }
+      ],
+      "description": "Endpoints for user registration and authentication. All other protected endpoints require a Bearer token obtained from these routes."
+    },
+    {
+      "name": "Upload",
+      "item": [
+        {
+          "name": "Upload File",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "description": "The file to upload (PDF, DOCX, TXT, etc.)",
+                  "value": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/upload",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "upload"
+              ]
+            },
+            "description": "Upload a file for the authenticated user. Send a multipart/form-data request with a single file field named `file`. Returns the stored file path/URL and metadata such as filename, size, and MIME type."
+          },
+          "response": []
+        },
+        {
+          "name": "Parse Remote URL",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"url\": \"https://example.com/document.pdf\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/upload/parse-url",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "upload",
+                "parse-url"
+              ]
+            },
+            "description": "Fetch and parse content from a remote URL. Provide a publicly accessible URL in the request body. The server downloads the resource, extracts its text content, and returns it for further processing."
+          },
+          "response": []
+        }
+      ],
+      "description": "Endpoints for uploading files and parsing remote URLs. All routes require authentication."
+    },
+    {
+      "name": "Documents",
+      "item": [
+        {
+          "name": "Get Documents",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "documents"
+              ]
+            },
+            "description": "Retrieve all documents belonging to the authenticated user. Returns an array of document objects including metadata such as title, creation date, and file type."
+          },
+          "response": []
+        },
+        {
+          "name": "Save Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"My Document\",\n  \"content\": \"Document text content here...\",\n  \"metadata\": {}\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/documents/save",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "documents",
+                "save"
+              ]
+            },
+            "description": "Save a new document or update an existing one for the authenticated user. Provide the document title, content, and any optional metadata. If an `id` is included in the body, the existing document is updated; otherwise a new document is created."
+          },
+          "response": []
+        },
+        {
+          "name": "Delete Document",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"document-id-here\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/documents",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "documents"
+              ]
+            },
+            "description": "Delete a document belonging to the authenticated user. Provide the document ID in the request body. The document is permanently removed and cannot be recovered."
+          },
+          "response": []
+        }
+      ],
+      "description": "CRUD operations for user documents. All routes are protected and operate on documents belonging to the authenticated user."
+    },
+    {
+      "name": "Pipeline",
+      "item": [
+        {
+          "name": "Ingest Document",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "description": "The document file to ingest (PDF, DOCX, TXT, etc.)",
+                  "value": ""
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/pipeline/ingest",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pipeline",
+                "ingest"
+              ]
+            },
+            "description": "Ingest a document into the processing pipeline. Upload a file via multipart/form-data. The server parses the document, splits it into chunks, generates vector embeddings, and stores them for semantic retrieval. Use the search endpoints to query ingested content."
+          },
+          "response": []
+        },
+        {
+          "name": "Search Documents (POST)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"query\": \"What are the key findings in the report?\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/pipeline/search",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pipeline",
+                "search"
+              ]
+            },
+            "description": "Perform a semantic search over all ingested documents (POST variant). Provide a natural language query in the request body. Returns ranked document chunks most relevant to the query, along with similarity scores and source metadata."
+          },
+          "response": []
+        },
+        {
+          "name": "Search Documents (GET)",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/pipeline/search?query=your search query here",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "pipeline",
+                "search"
+              ],
+              "query": [
+                {
+                  "key": "query",
+                  "value": "your search query here",
+                  "description": "Natural language search query to run against ingested documents."
+                }
+              ]
+            },
+            "description": "Perform a semantic search over all ingested documents (GET variant). Pass the search query as a URL query parameter named `query`. Returns ranked document chunks most relevant to the query. Useful for quick browser-based or link-based searches."
+          },
+          "response": []
+        }
+      ],
+      "description": "Document ingestion and semantic search pipeline. Ingest documents to embed and index them, then search across ingested content using natural language queries. All routes are protected."
+    },
+    {
+      "name": "Analysis",
+      "item": [
+        {
+          "name": "Get Analysis",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"content\": \"Paste your document text or provide a document ID here.\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/analysis",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "analysis"
+              ]
+            },
+            "description": "Run analysis on a document or raw text input. Provide the text content (or a reference to an ingested document) in the request body. Returns structured analysis results such as key topics, summaries, sentiment, and actionable insights."
+          },
+          "response": []
+        }
+      ],
+      "description": "Endpoints for running AI-powered analysis on documents or raw text content."
+    },
+    {
+      "name": "Supabase",
+      "item": [
+        {
+          "name": "Health Check",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/supabase/health",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supabase",
+                "health"
+              ]
+            },
+            "description": "Check the health and connectivity of the Supabase backend. Returns a status object indicating whether the database connection is active and responsive. Useful for monitoring and uptime checks."
+          },
+          "response": []
+        },
+        {
+          "name": "Upsert Draft",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              },
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"id\": \"optional-draft-id\",\n  \"title\": \"Draft Title\",\n  \"content\": \"Draft content here...\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/supabase/drafts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supabase",
+                "drafts"
+              ]
+            },
+            "description": "Create or update a draft for the authenticated user (upsert). If a draft with the provided `id` already exists, it is updated with the new content. If no `id` is provided, a new draft is created. Returns the saved draft object."
+          },
+          "response": []
+        },
+        {
+          "name": "Get Drafts",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{token}}"
+              }
+            ],
+            "url": {
+              "raw": "{{baseUrl}}/supabase/drafts",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "supabase",
+                "drafts"
+              ]
+            },
+            "description": "Load all drafts belonging to the authenticated user. Returns an array of draft objects sorted by last-modified date (most recent first). Each draft includes its ID, title, content, and timestamps."
+          },
+          "response": []
+        }
+      ],
+      "description": "Supabase-specific utility endpoints for health checking and managing user drafts."
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000",
+      "description": "Base URL of the Express.js server. Change this to your deployed URL when testing in production."
+    },
+    {
+      "key": "token",
+      "value": "",
+      "description": "JWT Bearer token obtained after a successful /auth/login or /auth/signup call. Set this automatically via the Login or Signup request's test script."
+    }
+  ]
+}
