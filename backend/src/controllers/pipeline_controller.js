@@ -16,8 +16,13 @@ export const ingestDocument = async (req, res, next) => {
 
     // Check for uploaded file
     if (req.file) {
-      htmlContent = await parseFileToHtml(req.file.buffer, req.file.originalname, req.file.mimetype);
-      // Use uploaded file name (excluding extension) as fallback documentName if not specified
+      htmlContent = await parseFileToHtml(
+        req.file.buffer,
+        req.file.originalname,
+        req.file.mimetype
+      );
+
+      // Use uploaded filename as fallback
       if (!documentName) {
         documentName = req.file.originalname.replace(/\.[^/.]+$/, "");
       }
@@ -26,14 +31,27 @@ export const ingestDocument = async (req, res, next) => {
     }
 
     if (!htmlContent) {
-      return errorResponse(res, "Missing HTML content. Upload a file or provide 'html' in the body.", null, 400);
+      return errorResponse(
+        res,
+        "Missing HTML content. Upload a file or provide 'html' in the body.",
+        null,
+        400
+      );
     }
 
     if (!documentName) {
-      return errorResponse(res, "Missing 'documentName' parameter.", null, 400);
+      return errorResponse(
+        res,
+        "Missing 'documentName' parameter.",
+        null,
+        400
+      );
     }
 
-    console.log(`[Pipeline Controller] Processing ingestion request for document: "${documentName}"`);
+    console.log(
+      `[Pipeline Controller] Processing ingestion request for document: "${documentName}"`
+    );
+
     const result = await ingestHtmlContent(htmlContent, documentName);
 
     return successResponse(
@@ -49,11 +67,7 @@ export const ingestDocument = async (req, res, next) => {
 };
 
 /**
- * Controller to perform cosine similarity search against ingested legal chunks.
- * Expects JSON body/query parameters:
- * - "query": Search phrase / term (required)
- * - "threshold": Minimum cosine similarity score (optional, defaults to 0.3)
- * - "limit": Maximum records count to return (optional, defaults to 5)
+ * Controller to perform cosine similarity search.
  */
 export const searchDocument = async (req, res, next) => {
   try {
@@ -62,14 +76,32 @@ export const searchDocument = async (req, res, next) => {
     const limitVal = req.body.limit || req.query.limit;
 
     if (!query) {
-      return errorResponse(res, "Missing 'query' parameter for similarity search.", null, 400);
+      return errorResponse(
+        res,
+        "Missing 'query' parameter for similarity search.",
+        null,
+        400
+      );
     }
 
-    const matchThreshold = thresholdVal ? parseFloat(thresholdVal) : 0.3;
-    const matchCount = limitVal ? parseInt(limitVal, 10) : 5;
+    // Lower default threshold to 0
+    const matchThreshold = thresholdVal
+      ? parseFloat(thresholdVal)
+      : 0;
 
-    console.log(`[Pipeline Controller] Searching similarity for: "${query}" (Threshold: ${matchThreshold}, Limit: ${matchCount})`);
-    const results = await searchLegalChunks(query, matchThreshold, matchCount);
+    const matchCount = limitVal
+      ? parseInt(limitVal, 10)
+      : 5;
+
+    console.log(
+      `[Pipeline Controller] Searching similarity for: "${query}" (Threshold: ${matchThreshold}, Limit: ${matchCount})`
+    );
+
+    const results = await searchLegalChunks(
+      query,
+      matchThreshold,
+      matchCount
+    );
 
     return successResponse(
       res,

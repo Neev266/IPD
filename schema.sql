@@ -22,7 +22,7 @@ CREATE TABLE public.legal_chunks (
 -- Similarity Search RPC
 CREATE OR REPLACE FUNCTION public.match_legal_chunks(
    query_embedding VECTOR(3072),
-   match_threshold FLOAT DEFAULT 0.3,
+   match_threshold FLOAT DEFAULT 0.05,
    match_count INT DEFAULT 5
 )
 RETURNS TABLE (

@@ -48,7 +48,8 @@ export async function generateEmbeddings(chunks, apiKey) {
           model: "gemini-embedding-001",
           contents: chunk.content,
           config: {
-            taskType: "RETRIEVAL_DOCUMENT"
+            taskType: "RETRIEVAL_DOCUMENT",
+            outputDimensionality: 3072
           }
         });
         console.dir(response, { depth: null });

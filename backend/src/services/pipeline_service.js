@@ -89,7 +89,7 @@ export async function searchLegalChunks(queryText, matchThreshold = 0.3, matchCo
   } else {
     const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
     const response = await ai.models.embedContent({
-      model: "gemini-embedding-2",
+      model: "gemini-embedding-001",
       contents: queryText,
       config: {
         taskType: "RETRIEVAL_QUERY"
@@ -129,5 +129,9 @@ export async function searchLegalChunks(queryText, matchThreshold = 0.3, matchCo
     throw new Error(`Database search RPC failure: ${error.message}`);
   }
 
-  return results || [];
+  const filteredResults = (results || []).filter(
+    (result) => result.similarity >= matchThreshold
+  );
+
+  return filteredResults;
 }
