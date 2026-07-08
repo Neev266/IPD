@@ -47,6 +47,9 @@ export async function generateEmbeddings(chunks, apiKey) {
         const response = await ai.models.embedContent({
           model: "gemini-embedding-001",
           contents: chunk.content,
+          config: {
+            taskType: "RETRIEVAL_DOCUMENT"
+          }
         });
         console.dir(response, { depth: null });
 

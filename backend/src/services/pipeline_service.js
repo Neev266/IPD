@@ -89,23 +89,41 @@ export async function searchLegalChunks(queryText, matchThreshold = 0.3, matchCo
   } else {
     const ai = new GoogleGenAI({ apiKey: env.GEMINI_API_KEY });
     const response = await ai.models.embedContent({
-      model: "gemini-embedding-001",
+      model: "gemini-embedding-2",
       contents: queryText,
+      config: {
+        taskType: "RETRIEVAL_QUERY"
+      }
     });
 
-    if (!response || !response.embedding || !response.embedding.values) {
+    console.dir(response, { depth: null });
+
+    if (
+      !response ||
+      !response.embeddings ||
+      response.embeddings.length === 0 ||
+      !response.embeddings[0].values
+    ) {
       throw new Error("Failed to generate embedding for query search.");
     }
 
-    queryEmbedding = response.embedding.values;
+    queryEmbedding = response.embeddings[0].values;
   }
 
   console.log(`[Pipeline Service] Executing similarity search RPC: match_legal_chunks`);
+  console.log("Query embedding length:", queryEmbedding.length);
+  console.log("First 5 values:", queryEmbedding.slice(0, 5));
+  console.log("Threshold:", matchThreshold);
+  console.log("Limit:", matchCount);
+
   const { data: results, error } = await supabase.rpc("match_legal_chunks", {
     query_embedding: queryEmbedding,
     match_threshold: matchThreshold,
     match_count: matchCount,
   });
+
+  console.log("RPC Error:", error);
+  console.log("RPC Results:", results);
 
   if (error) {
     throw new Error(`Database search RPC failure: ${error.message}`);
