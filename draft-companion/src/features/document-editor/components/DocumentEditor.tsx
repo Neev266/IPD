@@ -44,12 +44,14 @@ const PageView = ({
   onOverflow,
   onDeletePage,
   registerRef,
+  onInput,
 }: {
   page: PageData;
   pageIndex: number;
   onOverflow: (pageIndex: number, overflowHtml: string) => void;
   onDeletePage: (pageIndex: number) => void;
   registerRef: (pageIndex: number, el: HTMLDivElement | null) => void;
+  onInput?: () => void;
 }) => {
   const elRef = useRef<HTMLDivElement | null>(null);
   const isChecking = useRef(false);
@@ -113,7 +115,8 @@ const PageView = ({
 
   const handleInput = useCallback(() => {
     requestAnimationFrame(() => detectOverflow());
-  }, [detectOverflow]);
+    onInput?.();
+  }, [detectOverflow, onInput]);
 
   // Check if the page is effectively empty
   const isPageEmpty = useCallback(() => {
@@ -220,10 +223,13 @@ export const DocumentEditor = ({
   onChange,
   onSave,
   isSaving,
+  onIngest,
+  isIngesting,
 }: any) => {
   const [drafting, setDrafting] = useState(false);
   const [newTitle, setNewTitle] = useState("");
   const [newContent, setNewContent] = useState("");
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Build pages with initial content from clauses or raw HTML —
   // this runs on FIRST render so the first page already has HTML
@@ -240,6 +246,70 @@ export const DocumentEditor = ({
     },
     []
   );
+
+  // ── Debounced input change tracking ──
+  const handlePageInput = useCallback(() => {
+    if (debounceTimeoutRef.current) {
+      clearTimeout(debounceTimeoutRef.current);
+    }
+    debounceTimeoutRef.current = setTimeout(() => {
+      const currentHtml = pageElRefs.current
+        .filter((el) => el !== null)
+        .map((el) => el.innerHTML)
+        .join("");
+      console.log("[EDITOR] Debounced auto-save update.");
+      onChange?.(currentHtml);
+    }, 1500);
+  }, [onChange]);
+
+  // Clean up debounce timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+      }
+    };
+  }, []);
+
+  // ── Synchronize pages state when initialHtml changes externally ──
+  useEffect(() => {
+    if (initialHtml) {
+      const currentHtml = pageElRefs.current
+        .filter((el) => el !== null)
+        .map((el) => el.innerHTML)
+        .join("");
+      if (currentHtml !== initialHtml) {
+        console.log("[EDITOR] Synchronizing pages with external initialHtml update.");
+        setPages([
+          { id: createPageId(), html: initialHtml },
+        ]);
+      }
+    }
+  }, [initialHtml]);
+
+  const handleEditorSave = useCallback(() => {
+    if (onSave) {
+      const currentHtml = pageElRefs.current
+        .filter((el) => el !== null)
+        .map((el) => el.innerHTML)
+        .join("");
+      console.log("[EDITOR] Triggering document save to backend...");
+      onChange?.(currentHtml);
+      onSave(currentHtml);
+    }
+  }, [onSave, onChange]);
+
+  const handleEditorIngest = useCallback(() => {
+    if (onIngest) {
+      const currentHtml = pageElRefs.current
+        .filter((el) => el !== null)
+        .map((el) => el.innerHTML)
+        .join("");
+      console.log("[EDITOR] Triggering semantic indexing...");
+      onChange?.(currentHtml);
+      onIngest(currentHtml);
+    }
+  }, [onIngest, onChange]);
 
   // ── Overflow check callable from parent (for AI inserts) ──
   const triggerOverflowCheck = useCallback(
@@ -410,7 +480,12 @@ export const DocumentEditor = ({
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#eceae1]/50 overflow-hidden relative">
-      <EditorToolbar onSave={onSave} isSaving={isSaving} />
+      <EditorToolbar
+        onSave={handleEditorSave}
+        isSaving={isSaving}
+        onIngest={handleEditorIngest}
+        isIngesting={isIngesting}
+      />
       <div className="flex-1 overflow-y-auto overflow-x-hidden flex flex-col items-center py-12 relative">
         {/* ── Pages ── */}
         {pages.map((page, i) => (
@@ -421,6 +496,7 @@ export const DocumentEditor = ({
             onOverflow={handleOverflow}
             onDeletePage={handleDeletePage}
             registerRef={registerRef}
+            onInput={handlePageInput}
           />
         ))}
 

@@ -12,6 +12,7 @@ import {
   SlidersHorizontal,
 } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
+import { pipelineApi } from "@/services/pipelineApi";
 
 interface AssistantPanelProps {
   onInsertClause: (text: string) => void;
@@ -69,31 +70,17 @@ const AssistantPanel = ({
     if (!searchQuery.trim()) return;
     setIsLocalSearching(true);
     try {
-      const token = localStorage.getItem("token");
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      console.log(`[Frontend Search] Querying: "${searchQuery}" (Threshold: ${threshold}, Limit: ${limit})`);
-      const response = await fetch("http://localhost:5000/api/pipeline/search", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          query: searchQuery,
-          threshold: threshold,
-          limit: limit,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Search request failed");
-      }
-
-      const data = await response.json();
-      setSearchResults(data.results || []);
+      console.log(`[SEARCH] Querying similarity matches: "${searchQuery}" (Threshold: ${threshold}, Limit: ${limit})`);
+      const data = await pipelineApi.search(searchQuery, threshold, limit);
+      
+      console.log(`[SEARCH] Received similarity search results. Count: ${data.results?.length}`);
+      const rawResults = data.results || [];
+      // Prioritize results that contain the query term (case-insensitive) to improve relevance.
+      const lowerQuery = searchQuery.toLowerCase();
+      const prioritized = rawResults.filter((r) => r.content.toLowerCase().includes(lowerQuery));
+      const others = rawResults.filter((r) => !r.content.toLowerCase().includes(lowerQuery));
+      const ordered = [...prioritized, ...others];
+      setSearchResults(ordered);
 
       if (!data.results || data.results.length === 0) {
         toast({
@@ -102,7 +89,7 @@ const AssistantPanel = ({
         });
       }
     } catch (err: any) {
-      console.error("Semantic search error:", err);
+      console.error("[SEARCH] Semantic search error:", err);
       toast({
         title: "Search failed",
         description: err.message || "Could not query similarity matches from database.",

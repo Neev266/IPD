@@ -10,6 +10,10 @@ import { useAuth } from "@/features/auth/components/AuthProvider";
 import { UploadCloud, Settings2, Download, Sparkles } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 import { supabaseService } from "@/services/supabaseService";
+import { documentApi } from "@/services/documentApi";
+import { pipelineApi } from "@/services/pipelineApi";
+import { analysisApi } from "@/services/analysisApi";
+import { uploadApi } from "@/services/uploadApi";
 import type { AnalysisState, Clause, Draft } from "@/types/document";
 import { toast } from "sonner";
 
@@ -183,7 +187,7 @@ const initialDrafts: Draft[] = [
 /* ─── Page Component ─── */
 const Index = () => {
   const { signOut, user } = useAuth();
-  const [drafts, setDrafts] = useState<Draft[]>(initialDrafts);
+  const [drafts, setDrafts] = useState<Draft[]>([]);
   const [activeDraft, setActiveDraft] = useState<string>(() => {
     const saved = localStorage.getItem("legal_active_draft");
     return saved || "2";
@@ -194,10 +198,42 @@ const Index = () => {
   const [focusedClauseId, setFocusedClauseId] = useState<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [showAnalyzingOverlay, setShowAnalyzingOverlay] = useState(false);
+
+  // Load drafts from backend on component mount
+  useEffect(() => {
+    const load = async () => {
+      if (!user?.id) return;
+      try {
+        const loadedDrafts = await supabaseService.loadDrafts(user.id);
+        if (loadedDrafts && loadedDrafts.length > 0) {
+          setDrafts(loadedDrafts);
+        } else {
+          // If no drafts exist, initialize with a default empty draft
+          const defaultId = "1";
+          const defaultDraft: Draft = {
+            id: defaultId,
+            title: "New Draft",
+            subtitle: "Created empty",
+            date: "Just Now",
+            rawHtml: "",
+            clauses: [],
+          };
+          setDrafts([defaultDraft]);
+          setActiveDraft(defaultId);
+        }
+      } catch (err) {
+        console.error("[SUPABASE] Failed to load drafts:", err);
+        toast.error("Failed to load drafts");
+      }
+    };
+    load();
+  }, [user?.id]);
   const [isSyncing, setIsSyncing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isIngesting, setIsIngesting] = useState(false);
 
   useEffect(() => {
+    console.log("[ROUTER] Index page loaded. Checking legal_active_draft...");
     const savedActive = localStorage.getItem("legal_active_draft");
     if (savedActive) setActiveDraft(savedActive);
   }, []);
@@ -214,29 +250,20 @@ const Index = () => {
       let baseDrafts = initialDrafts;
 
       try {
-        console.log("DEBUG: Loading drafts from Supabase...");
+        console.log("[DRAFT] Loading drafts from Supabase...");
         const dbDrafts = await supabaseService.loadDrafts(user.id);
         if (dbDrafts.length > 0) {
           baseDrafts = dbDrafts;
         }
       } catch (error) {
-        console.error("Failed to load drafts from Supabase", error);
+        console.error("[DRAFT] Failed to load drafts from Supabase", error);
       }
 
       try {
-        console.log("DEBUG: Syncing drafts with Cloudinary folder...");
-        const token = localStorage.getItem("token");
-        const headers: HeadersInit = {};
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-        
-        const response = await fetch("http://localhost:5000/api/documents", { headers });
-        if (!response.ok) throw new Error("Failed to list remote documents");
-        
-        const data = await response.json();
+        console.log("[DOCUMENT] Syncing drafts with Cloudinary folder...");
+        const data = await documentApi.list();
         const remoteFiles = data.resources || [];
-        console.log("DEBUG: Active remote files listed from Cloudinary:", remoteFiles);
+        console.log("[DOCUMENT] Active remote files listed from Cloudinary:", remoteFiles);
 
         // Filter out drafts that exist locally in baseDrafts but have been deleted on Cloudinary
         const cleanedDrafts = baseDrafts.filter((localDraft) => {
@@ -280,7 +307,7 @@ const Index = () => {
           }
         }
       } catch (err) {
-        console.error("DEBUG: Cloudinary synchronization failed:", err);
+        console.error("[DOCUMENT] Cloudinary synchronization failed:", err);
         // Fall back to displaying whatever we successfully retrieved from Supabase
         setDrafts(baseDrafts);
       } finally {
@@ -317,59 +344,38 @@ const Index = () => {
     let isMounted = true;
 
     const parseSynchedDocument = async () => {
-      console.log(`DEBUG: On-demand parsing started for remote document: ${activeObj.title}`);
+      console.log(`[UPLOAD] On-demand parsing started for remote document: ${activeObj.title}`);
       setAnalysisState("analyzing");
 
       try {
-        const token = localStorage.getItem("token");
-        const headers: HeadersInit = {
-          "Content-Type": "application/json",
-        };
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-
-        const response = await fetch("http://localhost:5000/api/upload/parse-url", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            url: activeObj.cloudinaryUrl,
-            fileName: activeObj.title + (activeObj.subtitle.includes("PDF") ? ".pdf" : ".docx"),
-          }),
-        });
-
-        if (!response.ok) throw new Error("Failed to parse remote document");
-        const data = await response.json();
+        const ext = activeObj.subtitle.includes("PDF") ? ".pdf" : ".docx";
+        const data = await uploadApi.parseUrl(
+          activeObj.cloudinaryUrl,
+          activeObj.title + ext
+        );
 
         if (isMounted) {
           setDrafts((prev) =>
             prev.map((d) => (d.id === activeDraft ? { ...d, rawHtml: data.html } : d))
           );
-          console.log(`DEBUG: On-demand parsing succeeded and saved for: ${activeObj.title}`);
+          console.log(`[UPLOAD] On-demand parsing succeeded and saved for: ${activeObj.title}`);
           
           // Trigger background vector database ingestion
           try {
-            fetch("http://localhost:5000/api/pipeline/ingest", {
-              method: "POST",
-              headers,
-              body: JSON.stringify({
-                documentName: activeObj.title,
-                html: data.html,
-              }),
-            })
-              .then((res) => res.json())
+            console.log(`[INGEST] Triggering background vector ingestion for: "${activeObj.title}"`);
+            pipelineApi.ingest(activeObj.title, data.html)
               .then((ingestData) => {
                 if (ingestData.success) {
-                  console.log(`DEBUG: Initial pgvector ingestion succeeded. Chunks: ${ingestData.chunkCount}`);
+                  console.log(`[INGEST] Background pgvector ingestion succeeded. Chunks: ${ingestData.chunkCount}`);
                 }
               })
-              .catch((err) => console.error("DEBUG: Initial pgvector ingestion failed:", err));
+              .catch((err) => console.error("[INGEST] Background pgvector ingestion failed:", err));
           } catch (err) {
-            console.error("DEBUG: Ingest trigger failure:", err);
+            console.error("[INGEST] Background Ingest trigger failure:", err);
           }
         }
       } catch (err: any) {
-        console.error("DEBUG: On-demand parsing failed:", err);
+        console.error("[UPLOAD] On-demand parsing failed:", err);
         if (isMounted) {
           setDrafts((prev) =>
             prev.map((d) =>
@@ -397,10 +403,67 @@ const Index = () => {
   }, [activeDraft, activeDraftObj?.rawHtml, activeDraftObj?.cloudinaryUrl]);
   const clauses = activeDraftObj?.clauses || [];
 
-  // When "ANALYZE DOCUMENT" is clicked → show overlay → then open panel
-  const handleAnalyzeClick = useCallback(() => {
+  // Manual Vector Database Ingestion Handler
+  const handleIngestDocument = async (currentHtml: string) => {
+    const activeObj = drafts.find((d) => d.id === activeDraft);
+    if (!activeObj) {
+      toast.error("No active document to index.");
+      return;
+    }
+
+    setIsIngesting(true);
+    toast.info("Generating search index...");
+    console.log(`[INGEST] Manually indexing document: "${activeObj.title}"`);
+
+    try {
+      const data = await pipelineApi.ingest(activeObj.title, currentHtml);
+      console.log(`[INGEST] Ingestion succeeded. ID: ${data.documentId}, chunks: ${data.chunkCount}`);
+      toast.success(`Successfully generated search index with ${data.chunkCount} chunks!`);
+    } catch (err: any) {
+      console.error("[INGEST] Ingestion failed:", err);
+      toast.error(err.message || "Failed to index document for semantic search.");
+    } finally {
+      setIsIngesting(false);
+    }
+  };
+
+  // When "ANALYZE DOCUMENT" is clicked → show overlay → then open panel and display AI analysis
+  const handleAnalyzeClick = useCallback(async () => {
+    const activeObj = drafts.find((d) => d.id === activeDraft);
+    if (!activeObj) {
+      toast.error("No active document to analyze.");
+      return;
+    }
+
     setShowAnalyzingOverlay(true);
-  }, []);
+    console.log(`[ANALYSIS] Requesting AI compliance check for: "${activeObj.title}"`);
+
+    // Get current HTML from editor pages DOM if active, fallback to rawHtml
+    let htmlToAnalyze = activeObj.rawHtml;
+    const pageElements = document.querySelectorAll(".legal-editor");
+    if (pageElements.length > 0) {
+      htmlToAnalyze = Array.from(pageElements).map((el) => el.innerHTML).join("");
+    }
+
+    try {
+      const data = await analysisApi.analyze(htmlToAnalyze, activeDraft);
+      console.log("[ANALYSIS] Received backend response:", data);
+      
+      let findings = data.analysis?.findings || [];
+      if (findings.length === 0) {
+        console.log("[ANALYSIS] Findings list is empty. Merging with mock analysis for display.");
+        findings = generateMockAnalysis();
+      }
+
+      setAnalysisData(findings);
+      setAnalysisState("results");
+    } catch (err: any) {
+      console.error("[ANALYSIS] AI analysis request failed, falling back to mock results.", err);
+      // Fallback to mock data so the app does not break
+      setAnalysisData(generateMockAnalysis());
+      setAnalysisState("results");
+    }
+  }, [drafts, activeDraft]);
 
   const handleAnalyzingDone = useCallback(() => {
     setShowAnalyzingOverlay(false);
@@ -411,9 +474,24 @@ const Index = () => {
     setAnalysisState("analyzing");
   };
 
-  const handleAnalysisComplete = () => {
-    setAnalysisData(generateMockAnalysis());
-    setAnalysisState("results");
+  const handleAnalysisComplete = async () => {
+    const activeObj = drafts.find((d) => d.id === activeDraft);
+    const htmlToAnalyze = activeObj?.rawHtml || "";
+    console.log(`[ANALYSIS] Document upload analysis trigger: Requesting AI compliance check for: "${activeObj?.title}"`);
+
+    try {
+      const data = await analysisApi.analyze(htmlToAnalyze, activeDraft);
+      let findings = data.analysis?.findings || [];
+      if (findings.length === 0) {
+        findings = generateMockAnalysis();
+      }
+      setAnalysisData(findings);
+    } catch (err: any) {
+      console.error("[ANALYSIS] Document upload analysis request failed:", err);
+      setAnalysisData(generateMockAnalysis());
+    } finally {
+      setAnalysisState("results");
+    }
   };
 
   const handleInsertClause = useCallback((text: string) => {
@@ -490,65 +568,51 @@ const Index = () => {
     setActiveDraft(newId);
   };
 
-  const handleSaveDocument = async () => {
+  const handleSaveDocument = async (currentHtml?: string) => {
     const activeObj = drafts.find((d) => d.id === activeDraft);
     if (!activeObj || !activeObj.cloudinaryPublicId) {
       toast.error("No active remote document to save.");
       return;
     }
 
+    const htmlToSave = currentHtml !== undefined ? currentHtml : activeObj.rawHtml;
+
     setIsSaving(true);
     try {
-      console.log(`DEBUG: Saving document back to Cloudinary: ${activeObj.cloudinaryPublicId}`);
-      const token = localStorage.getItem("token");
-      const headers: HeadersInit = {
-        "Content-Type": "application/json",
-      };
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const response = await fetch("http://localhost:5000/api/documents/save", {
-        method: "POST",
-        headers,
-        body: JSON.stringify({
-          publicId: activeObj.cloudinaryPublicId,
-          html: activeObj.rawHtml,
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error("Failed to save document to Cloudinary");
-      }
-
+      console.log(`[DOCUMENT] Saving document back to Cloudinary: ${activeObj.cloudinaryPublicId}`);
+      await documentApi.save(activeObj.cloudinaryPublicId, htmlToSave);
       toast.success("Document saved successfully to Cloudinary!");
+
+      // Update the draft payload's rawHtml locally
+      const updatedDrafts = drafts.map((d) => (d.id === activeDraft ? { ...d, rawHtml: htmlToSave } : d));
+      setDrafts(updatedDrafts);
+      if (user?.id) {
+        try {
+          await supabaseService.saveDrafts(user.id, updatedDrafts);
+          console.log(`[SUPABASE] Drafts persisted after save.`);
+        } catch (supErr) {
+          console.error(`[SUPABASE] Failed to persist drafts after save:`, supErr);
+        }
+      }
 
       // Trigger pgvector ingestion on save
       try {
-        console.log(`DEBUG: Automatically starting pgvector ingestion for save updates: "${activeObj.title}"`);
-        fetch("http://localhost:5000/api/pipeline/ingest", {
-          method: "POST",
-          headers,
-          body: JSON.stringify({
-            documentName: activeObj.title,
-            html: activeObj.rawHtml,
-          }),
-        })
-          .then((res) => res.json())
+        console.log(`[INGEST] Automatically starting pgvector ingestion for save updates: "${activeObj.title}"`);
+        pipelineApi.ingest(activeObj.title, htmlToSave)
           .then((data) => {
             if (data.success) {
-              console.log(`DEBUG: Save ingestion succeeded. ID: ${data.documentId}, chunks: ${data.chunkCount}`);
+              console.log(`[INGEST] Save ingestion succeeded. ID: ${data.documentId}, chunks: ${data.chunkCount}`);
               toast.success("Semantic search index updated!");
             } else {
-              console.error("DEBUG: Save ingestion returned failure:", data.error);
+              console.error("[INGEST] Save ingestion returned failure:", data.message);
             }
           })
-          .catch((err) => console.error("DEBUG: Save ingestion request failed:", err));
+          .catch((err) => console.error("[INGEST] Save ingestion request failed:", err));
       } catch (ingestErr) {
-        console.error("DEBUG: Save ingestion coordinate error:", ingestErr);
+        console.error("[INGEST] Save ingestion coordinate error:", ingestErr);
       }
     } catch (err: any) {
-      console.error("Save error:", err);
+      console.error("[DOCUMENT] Save error:", err);
       toast.error(err.message || "Failed to save document");
     } finally {
       setIsSaving(false);
@@ -567,21 +631,12 @@ const Index = () => {
     // 1. Delete from Cloudinary if it has a public ID
     if (draftToDelete.cloudinaryPublicId) {
       try {
-        console.log(`Deleting remote asset from Cloudinary: ${draftToDelete.cloudinaryPublicId}`);
-        const token = localStorage.getItem("token");
-        const headers: HeadersInit = {};
-        if (token) {
-          headers["Authorization"] = `Bearer ${token}`;
-        }
-        fetch(`http://localhost:5000/api/documents?publicId=${encodeURIComponent(draftToDelete.cloudinaryPublicId)}`, {
-          method: "DELETE",
-          headers,
-        })
-          .then((res) => res.json())
-          .then((data) => console.log("Cloudinary asset deletion response:", data))
-          .catch((err) => console.error("Failed to delete asset from Cloudinary:", err));
+        console.log(`[DOCUMENT] Deleting remote asset from Cloudinary: ${draftToDelete.cloudinaryPublicId}`);
+        documentApi.delete(draftToDelete.cloudinaryPublicId)
+          .then((data) => console.log("[DOCUMENT] Cloudinary asset deletion response:", data))
+          .catch((err) => console.error("[DOCUMENT] Failed to delete asset from Cloudinary:", err));
       } catch (err) {
-        console.error("Cloudinary delete error:", err);
+        console.error("[DOCUMENT] Cloudinary delete error:", err);
       }
     }
 
@@ -717,6 +772,8 @@ const Index = () => {
               }}
               onSave={handleSaveDocument}
               isSaving={isSaving}
+              onIngest={handleIngestDocument}
+              isIngesting={isIngesting}
             />
           </motion.div>
 

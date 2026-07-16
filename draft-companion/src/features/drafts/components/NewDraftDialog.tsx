@@ -10,12 +10,18 @@ import { UploadCloud, FileText, FileCode, ArrowLeft, Loader2, Sparkles } from "l
 import { motion, AnimatePresence } from "framer-motion";
 import { toast } from "sonner";
 import { supabase } from "@/lib/supabase";
+import { uploadApi } from "@/services/uploadApi";
 
 interface NewDraftDialogProps {
   isOpen: boolean;
   onClose: () => void;
   onCreateBlank: () => void;
-  onCreateFromImport: (fileName: string, parsedHtml: string, cloudinaryUrl: string) => void;
+  onCreateFromImport: (
+    fileName: string,
+    parsedHtml: string,
+    cloudinaryUrl: string,
+    cloudinaryPublicId?: string
+  ) => void;
 }
 
 type DialogMode = "choice" | "upload";
@@ -90,31 +96,16 @@ export default function NewDraftDialog({
         );
       }, 2000);
 
-      const token = localStorage.getItem("token");
-      const headers: HeadersInit = {};
-      if (token) {
-        headers["Authorization"] = `Bearer ${token}`;
-      }
-
-      const response = await fetch("http://localhost:5000/api/upload", {
-        method: "POST",
-        headers,
-        body: formData,
-      });
-
-      if (!response.ok) {
-        const errorData = await response.json().catch(() => ({}));
-        throw new Error(errorData.error || "Failed to process and convert file.");
-      }
-
-      const data = await response.json();
+      console.log(`[UPLOAD] Starting file upload for: ${file.name}`);
+      const data = await uploadApi.upload(formData);
+      console.log(`[UPLOAD] Successfully uploaded and parsed document: "${data.fileName}". Cloudinary Public ID: ${data.cloudinaryPublicId}`);
       toast.success("Document successfully uploaded and converted!");
       
       // Pass the returned details up
       onCreateFromImport(data.fileName, data.html, data.cloudinaryUrl, data.cloudinaryPublicId);
       handleClose();
     } catch (err: any) {
-      console.error("Upload error:", err);
+      console.error("[UPLOAD] Upload error:", err);
       setErrorMsg(err.message || "Could not connect to the backend server. Make sure it is running on port 5000.");
     } finally {
       setIsUploading(false);

@@ -1,7 +1,7 @@
 import {
   Bold, Italic, Underline, AlignLeft, AlignCenter, AlignRight, AlignJustify,
   List, ListOrdered, Type, Highlighter, ChevronDown, Download, FileType, FileText as FileTextIcon,
-  Undo, Redo, Minus, Plus, Save
+  Undo, Redo, Minus, Plus, Save, Sparkles
 } from "lucide-react";
 import { useState, useRef, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -52,7 +52,17 @@ const ToolbarButton = ({
 
 const ToolbarDivider = () => <div className="w-px h-5 bg-[#d4cfc1] mx-1.5" />;
 
-const EditorToolbar = ({ onSave, isSaving }: { onSave?: () => void; isSaving?: boolean }) => {
+const EditorToolbar = ({
+  onSave,
+  isSaving,
+  onIngest,
+  isIngesting,
+}: {
+  onSave?: () => void;
+  isSaving?: boolean;
+  onIngest?: () => void;
+  isIngesting?: boolean;
+}) => {
   const [isDownloadOpen, setIsDownloadOpen] = useState(false);
   const [isFontOpen, setIsFontOpen] = useState(false);
   const [isSizeOpen, setIsSizeOpen] = useState(false);
@@ -329,6 +339,18 @@ const EditorToolbar = ({ onSave, isSaving }: { onSave?: () => void; isSaving?: b
           title={isSaving ? "Saving..." : "Save Document"}
         >
           <Save size={18} className={isSaving ? "animate-spin" : ""} />
+        </button>
+      )}
+
+      {/* Index for Semantic Search Button */}
+      {onIngest && (
+        <button
+          onClick={onIngest}
+          disabled={isIngesting}
+          className={`p-2 rounded-full transition-all duration-300 text-[#555] hover:bg-[#1a202c] hover:text-white hover:shadow-md ${isIngesting ? 'opacity-50 cursor-not-allowed' : ''}`}
+          title={isIngesting ? "Indexing document..." : "Index for Semantic Search"}
+        >
+          <Sparkles size={18} className={isIngesting ? "animate-spin text-amber-500" : ""} />
         </button>
       )}
 

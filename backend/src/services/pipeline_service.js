@@ -129,9 +129,11 @@ export async function searchLegalChunks(queryText, matchThreshold = 0.3, matchCo
     throw new Error(`Database search RPC failure: ${error.message}`);
   }
 
-  const filteredResults = (results || []).filter(
-    (result) => result.similarity >= matchThreshold
-  );
+  // Filter results by threshold and sort by descending similarity
+  const filteredResults = (results || [])
+    .filter((result) => result.similarity >= matchThreshold)
+    .sort((a, b) => b.similarity - a.similarity)
+    .slice(0, matchCount);
 
   return filteredResults;
 }
