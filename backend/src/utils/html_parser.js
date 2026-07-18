@@ -14,6 +14,25 @@ export function parseHTMLToSections(htmlContent) {
   // Strip scripts, styles, nav, and footers entirely
   $("script, style, nav, footer").remove();
 
+  // Strip system-added import header metadata (h1, p, hr)
+  $("p").each((_i, el) => {
+    const text = $(el).text().trim();
+    if (/^Imported from (Word Document|PDF|Plain Text)$/i.test(text)) {
+      // Remove preceding h1 (document title) if it exists
+      const prevH1 = $(el).prev("h1");
+      if (prevH1.length > 0) {
+        prevH1.remove();
+      }
+      // Remove following hr if it exists
+      const nextHr = $(el).next("hr");
+      if (nextHr.length > 0) {
+        nextHr.remove();
+      }
+      // Remove the metadata paragraph itself
+      $(el).remove();
+    }
+  });
+
   const sections = [];
   let currentSectionHeader = "";
   let currentSectionText = "";

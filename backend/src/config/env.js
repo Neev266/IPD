@@ -32,7 +32,10 @@ export const env = {
   JWT_SECRET: process.env.JWT_SECRET || "super_secret_for_ipd_draft_companion_app",
   NODE_ENV: process.env.NODE_ENV || "development",
   GEMINI_API_KEY: process.env.GEMINI_API_KEY,
+  PYTHON_BACKEND_URL: (process.env.PYTHON_BACKEND_URL || "http://127.0.0.1:8000").replace(/\r/g, "").trim(),
 };
+
+
 
 // Simple configuration checker
 export const isCloudinaryConfigured = 

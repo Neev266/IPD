@@ -49,14 +49,25 @@ export async function upsertToDatabase(documentName, chunksWithEmbeddings) {
   const documentId = newDoc.id;
   console.log(`[Document Service] New document created with ID: ${documentId}`);
 
-  // Format chunks for insertion
-  const chunksToInsert = chunksWithEmbeddings.map((c) => ({
-    document_id: documentId,
-    content: c.content,
-    section_header: c.section_header,
-    chunk_index: c.chunk_index,
-    embedding: c.embedding, // Primitive float array accepted natively by pgvector
-  }));
+  // Format chunks for insertion and clean text format
+  const chunksToInsert = chunksWithEmbeddings.map((c) => {
+    const cleanContent = (c.content || "")
+      .replace(/\r/g, "") // remove carriage returns
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, " ") // remove control characters
+      .split("\n")
+      .map(line => line.trim().replace(/\s+/g, " ")) // trim and normalize line spaces
+      .filter(line => line.length > 0) // remove empty lines
+      .join("\n");
+
+    return {
+      document_id: documentId,
+      content: cleanContent,
+      section_header: c.section_header,
+      chunk_index: c.chunk_index,
+      embedding: c.embedding, // Primitive float array accepted natively by pgvector
+    };
+  });
+
 
   // Perform bulk insertion in batches of 100 to optimize bandwidth and avoid database limits
   const BATCH_SIZE = 100;

@@ -48,3 +48,19 @@ BEGIN
    LIMIT match_count;
 END;
 $$;
+
+
+-- Classifications Table to store clause classifications & risk evaluations
+CREATE TABLE IF NOT EXISTS public.document_classifications (
+    id BIGSERIAL PRIMARY KEY,
+    document_id UUID NOT NULL REFERENCES public.documents(id) ON DELETE CASCADE,
+    chunk_index INT,
+    category TEXT NOT NULL,
+    answer TEXT NOT NULL,
+    risk TEXT NOT NULL, -- 'High', 'Medium', 'Low'
+    explanation TEXT,
+    suggestion TEXT,
+    confidence_score INT NOT NULL, -- percentage score (0-100)
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
