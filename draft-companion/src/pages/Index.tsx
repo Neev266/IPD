@@ -198,6 +198,7 @@ const Index = () => {
   const [focusedClauseId, setFocusedClauseId] = useState<string | null>(null);
   const [isPanelOpen, setIsPanelOpen] = useState(false);
   const [showAnalyzingOverlay, setShowAnalyzingOverlay] = useState(false);
+  const [searchHighlight, setSearchHighlight] = useState("");
 
   // Load drafts from backend on component mount
   useEffect(() => {
@@ -446,7 +447,7 @@ const Index = () => {
     }
 
     try {
-      const data = await analysisApi.analyze(htmlToAnalyze, activeDraft);
+      const data = await analysisApi.analyze(htmlToAnalyze, activeDraft, activeObj.title);
       console.log("[ANALYSIS] Received backend response:", data);
       
       let findings = data.analysis?.findings || [];
@@ -457,17 +458,19 @@ const Index = () => {
 
       setAnalysisData(findings);
       setAnalysisState("results");
+      setIsPanelOpen(true); // Open panel to show chatbot and risk flags!
     } catch (err: any) {
       console.error("[ANALYSIS] AI analysis request failed, falling back to mock results.", err);
       // Fallback to mock data so the app does not break
       setAnalysisData(generateMockAnalysis());
       setAnalysisState("results");
+      setIsPanelOpen(true); // Open panel to show chatbot and risk flags!
     }
   }, [drafts, activeDraft]);
 
   const handleAnalyzingDone = useCallback(() => {
     setShowAnalyzingOverlay(false);
-    setIsPanelOpen(true);
+    setIsPanelOpen(true); // Open panel to show chatbot and risk flags!
   }, []);
 
   const handleStartUpload = () => {
@@ -480,17 +483,19 @@ const Index = () => {
     console.log(`[ANALYSIS] Document upload analysis trigger: Requesting AI compliance check for: "${activeObj?.title}"`);
 
     try {
-      const data = await analysisApi.analyze(htmlToAnalyze, activeDraft);
+      const data = await analysisApi.analyze(htmlToAnalyze, activeDraft, activeObj?.title || "");
       let findings = data.analysis?.findings || [];
       if (findings.length === 0) {
         findings = generateMockAnalysis();
       }
       setAnalysisData(findings);
+      setAnalysisState("results");
+      setIsPanelOpen(true); // Open panel to show chatbot and risk flags!
     } catch (err: any) {
       console.error("[ANALYSIS] Document upload analysis request failed:", err);
       setAnalysisData(generateMockAnalysis());
-    } finally {
       setAnalysisState("results");
+      setIsPanelOpen(true); // Open panel to show chatbot and risk flags!
     }
   };
 
@@ -566,6 +571,20 @@ const Index = () => {
     };
     setDrafts((prev) => [...prev, newDraft]);
     setActiveDraft(newId);
+
+    // Trigger background vector database ingestion & automatic classification
+    try {
+      console.log(`[INGEST] Automatically starting ingestion & classification for: "${cleanName}"`);
+      pipelineApi.ingest(cleanName, parsedHtml)
+        .then((ingestData) => {
+          if (ingestData.success) {
+            console.log(`[INGEST] Ingestion and classification succeeded. Chunks: ${ingestData.chunkCount}`);
+          }
+        })
+        .catch((err) => console.error("[INGEST] Ingestion request failed:", err));
+    } catch (err) {
+      console.error("[INGEST] Ingestion trigger failure:", err);
+    }
   };
 
   const handleSaveDocument = async (currentHtml?: string) => {
@@ -763,6 +782,8 @@ const Index = () => {
               key={activeDraft}
               clauses={clauses}
               initialHtml={activeDraftObj?.rawHtml}
+              analysisFindings={analysisState === "results" ? analysisData : []}
+              searchHighlight={searchHighlight}
               onAddClause={handleAddClause}
               focusedClauseId={focusedClauseId}
               onChange={(newHtml: string) => {
@@ -781,31 +802,24 @@ const Index = () => {
             {isPanelOpen && (
               <motion.div
                 initial={{ width: 0, opacity: 0 }}
-                animate={{ width: analysisState === "results" ? 400 : 340, opacity: 1 }}
+                animate={{ width: 385, opacity: 1 }}
                 exit={{ width: 0, opacity: 0 }}
                 transition={{ type: "spring", stiffness: 300, damping: 30 }}
                 className="h-full flex-shrink-0 relative z-10 shadow-[-20px_0_40px_rgba(0,0,0,0.05)] overflow-hidden flex"
               >
-                {/* Right Panel dynamic swap */}
-                {analysisState === "results" ? (
-                  <AnalysisDashboard
-                    data={analysisData}
-                    onClose={() => {
-                      setAnalysisState("idle");
-                      setFocusedClauseId(null);
-                      setIsPanelOpen(false);
-                    }}
-                    focusedClauseId={focusedClauseId}
-                    onFocusClause={setFocusedClauseId}
-                  />
-                ) : (
-                  <AssistantPanel
-                    onInsertClause={handleInsertClause}
-                    onAnalyze={() => setAnalysisState("ready")}
-                    isAnalyzing={analysisState === "analyzing" || analysisState === "ready"}
-                    onClose={() => setIsPanelOpen(false)}
-                  />
-                )}
+                <AssistantPanel
+                  onInsertClause={handleInsertClause}
+                  onAnalyze={() => setAnalysisState("ready")}
+                  isAnalyzing={analysisState === "analyzing" || analysisState === "ready"}
+                  onClose={() => setIsPanelOpen(false)}
+                  analysisFindings={analysisData}
+                  focusedClauseId={focusedClauseId}
+                  onFocusClause={setFocusedClauseId}
+                  onSearchQuery={setSearchHighlight}
+                  activeSearchHighlight={searchHighlight}
+                  documentId={activeDraft}
+                  documentName={activeDraftObj?.title || ""}
+                />
               </motion.div>
             )}
           </AnimatePresence>

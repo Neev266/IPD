@@ -109,3 +109,78 @@ All colors MUST be HSL.
   0%, 100% { opacity: 0.6; transform: scale(1); }
   50% { opacity: 1; transform: scale(1.12); }
 }
+
+/* Risk flagging highlights for document analysis */
+.risk-flag-high {
+  background-color: #fee2e2 !important;
+  border-bottom: 2px solid #ef4444 !important;
+  color: #991b1b !important;
+  cursor: help;
+  padding: 1px 0;
+  border-radius: 2px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.risk-flag-medium {
+  background-color: #fef08a !important;
+  border-bottom: 2px solid #eab308 !important;
+  color: #854d0e !important;
+  cursor: help;
+  padding: 1px 0;
+  border-radius: 2px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.risk-flag-high:hover {
+  background-color: #fca5a5 !important;
+}
+
+.risk-flag-medium:hover {
+  background-color: #fde047 !important;
+}
+
+.risk-flag-low {
+  background-color: rgba(219, 234, 254, 0.95) !important;
+  border-bottom: 2px solid #3b82f6 !important;
+  color: #1e3a8a !important;
+  cursor: help;
+  padding: 1px 0;
+  border-radius: 2px;
+  position: relative;
+  transition: all 0.2s ease;
+}
+
+.risk-flag-low:hover {
+  background-color: rgba(191, 219, 254, 1) !important;
+}
+
+.search-highlight {
+  background-color: rgba(74, 222, 128, 0.35) !important;
+  border-bottom: 2px solid #22c55e !important;
+  color: #15803d !important;
+  font-weight: 500;
+  padding: 1px 0;
+  border-radius: 2px;
+  transition: all 0.2s ease;
+}
+
+.search-highlight:hover {
+  background-color: rgba(74, 222, 128, 0.55) !important;
+}
+
+@keyframes highlight-flash {
+  0% {
+    outline: 3px solid rgba(239, 68, 68, 0.8);
+    box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
+  }
+  100% {
+    outline: 3px solid transparent;
+    box-shadow: 0 0 0 transparent;
+  }
+}
+
+.highlight-pulse-active {
+  animation: highlight-flash 1.5s ease-out;
+}

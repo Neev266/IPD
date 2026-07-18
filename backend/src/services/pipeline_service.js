@@ -56,6 +56,104 @@ export async function ingestHtmlContent(htmlContent, documentName) {
   // 4. Save to DB
   const documentId = await upsertToDatabase(documentName, chunksWithEmbeddings);
 
+  // 5. Direct call to Python classification service for DeBERTa model
+  try {
+    const pythonBackendUrl = (env.PYTHON_BACKEND_URL || "http://127.0.0.1:8000")
+      .replace("localhost", "127.0.0.1")
+      .trim();
+    const classifyUrl = `${pythonBackendUrl}/api/classify`;
+
+    console.log(`[Pipeline Service] Invoking Python classification model directly at: ${classifyUrl}`);
+
+    const payloadChunks = chunks.map((c) => {
+      const sanitizedContent = (c.content || "")
+        .replace(/\r/g, "")
+        .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, " ")
+        .trim();
+      return {
+        content: sanitizedContent,
+        chunk_index: c.chunk_index
+      };
+    });
+
+    const response = await fetch(classifyUrl, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({
+        chunks: payloadChunks,
+        threshold: 0.01
+      })
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Python server returned status ${response.status}: ${errorText}`);
+    }
+
+    const responseData = await response.json();
+    const classifications = responseData.classifications || [];
+
+    if (classifications.length > 0) {
+      console.log(`[Pipeline Service] Received ${classifications.length} classified chunks from Python FastAPI.`);
+      
+      const CATEGORY_METADATA = {
+        "Non-Compete": { risk: "High", explanation: "A non-compete clause was found. This restricts your ability to engage in competing business activities.", suggestion: "Narrow scope." },
+        "Exclusivity": { risk: "High", explanation: "An exclusivity clause was found. This prevents you from working with other clients or vendors.", suggestion: "Limit scope." },
+        "Uncapped Liability": { risk: "High", explanation: "Uncapped liability exposes your company to unlimited financial claims in the event of a breach.", suggestion: "Add a cap." },
+        "No-Solicit Of Customers": { risk: "Medium", explanation: "A customer non-solicitation clause restricts you from soliciting the other party's clients.", suggestion: "Limit to direct solicitation." },
+        "No-Solicit Of Employees": { risk: "Medium", explanation: "An employee non-solicitation clause restricts you from hiring the other party's team members.", suggestion: "Ensure it is mutual." },
+        "Liquidated Damages": { risk: "Medium", explanation: "Liquidated damages require a pre-determined payment in case of a breach.", suggestion: "Negotiate compensatory damages." },
+        "Termination For Convenience": { risk: "Medium", explanation: "One or both parties can terminate the agreement without cause.", suggestion: "Ensure notice is sufficient." },
+        "Cap On Liability": { risk: "Medium", explanation: "A cap on liability was found. It restricts the damages you can recover from the other party.", suggestion: "Ensure mutual and high enough." },
+        "Warranty Duration": { risk: "Low", explanation: "Specifies the duration and terms of the product/service warranty.", suggestion: "Confirm standard period." },
+        "Insurance": { risk: "Low", explanation: "Specifies the required insurance coverage types and limits.", suggestion: "Verify coverage alignment." },
+        "Governing Law": { risk: "Low", explanation: "Defines the legal jurisdiction that will govern the contract.", suggestion: "Ensure agreeable jurisdiction." },
+        "Parties": { risk: "Low", explanation: "Identifies the contracting entities.", suggestion: "Check registrations." },
+        "Agreement Date": { risk: "Low", explanation: "The execution date of the agreement.", suggestion: "Verify details." },
+        "Effective Date": { risk: "Low", explanation: "The date when the rights and obligations under the contract take effect.", suggestion: "Check date." },
+        "Expiration Date": { risk: "Low", explanation: "The date when the contract is scheduled to expire.", suggestion: "Set reminders." },
+        "Renewal Term": { risk: "Low", explanation: "Specifies renewal conditions.", suggestion: "Ensure cancellation notice." },
+        "Notice Period To Terminate Renewal": { risk: "Low", explanation: "Specifies the notice period required to prevent automatic renewal.", suggestion: "Diarize notice date." },
+        "default": { risk: "Low", explanation: "Clause identified by AI model.", suggestion: "Review standard terms." }
+      };
+
+      const findingsToInsert = [];
+      for (const item of classifications) {
+        for (const rawFinding of item.findings) {
+          const category = rawFinding.category;
+          const meta = CATEGORY_METADATA[category] || CATEGORY_METADATA["default"];
+
+          findingsToInsert.push({
+            document_id: documentId,
+            category: category,
+            answer: rawFinding.answer,
+            risk: meta.risk,
+            explanation: meta.explanation,
+            suggestion: meta.suggestion,
+            confidence_score: Math.round(rawFinding.score * 100)
+          });
+        }
+      }
+
+      if (findingsToInsert.length > 0) {
+        console.log(`[Pipeline Service] Inserting ${findingsToInsert.length} classifications to Supabase...`);
+        const { error: insertError } = await supabase
+          .from("document_classifications")
+          .insert(findingsToInsert);
+
+        if (insertError) {
+          console.error("[Pipeline Service Error] Failed to store findings in Supabase:", insertError.message);
+        } else {
+          console.log("[Pipeline Service] Classifications successfully stored in Supabase.");
+        }
+      }
+    }
+  } catch (error) {
+    console.error("[Pipeline Service Error] Python model classification failed during ingestion:", error.message);
+  }
+
   return {
     documentId,
     chunkCount: chunksWithEmbeddings.length,
