@@ -100,10 +100,66 @@ const AssistantPanel = ({
   const [memoryContext, setMemoryContext] = useState<string | null>(null);
   const [isBotTyping, setIsBotTyping] = useState(false);
   const [isThinking, setIsThinking] = useState(false);
+  const [chatSessions, setChatSessions] = useState<any[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
 
+  // Load chat sessions on document mount
   useEffect(() => {
-    setMemoryContext(null);
-  }, [documentName]);
+    if (!documentName || !documentId) return;
+
+    const loadSessions = async () => {
+      try {
+        const res = await analysisApi.getSessions(documentId, documentName);
+        if (res && res.success && res.sessions && res.sessions.length > 0) {
+          setChatSessions(res.sessions);
+          const activeSess = res.sessions[0];
+          setActiveSessionId(activeSess.id);
+          setMemoryContext(activeSess.memory_context);
+          
+          // Load messages for this session
+          const msgRes = await analysisApi.getSessionMessages(activeSess.id);
+          if (msgRes && msgRes.success && msgRes.messages) {
+            if (msgRes.messages.length > 0) {
+              const formattedMsgs = msgRes.messages.map((m: any) => ({
+                id: m.id ? String(m.id) : undefined,
+                sender: m.sender as "user" | "bot",
+                text: m.message_text,
+                timestamp: m.created_at ? new Date(m.created_at) : new Date()
+              }));
+              setMessages(formattedMsgs);
+            } else {
+              setMessages([
+                {
+                  sender: "bot",
+                  text: "Hello! I am your legal companion. I can help analyze compliance flags, explain complex clauses, or draft revision suggestions. Ask me anything!",
+                  timestamp: new Date(),
+                }
+              ]);
+            }
+          }
+        } else {
+          // No past sessions, create a new session
+          const sessRes = await analysisApi.createSession(documentId, documentName);
+          if (sessRes && sessRes.success && sessRes.session) {
+            setChatSessions([sessRes.session]);
+            setActiveSessionId(sessRes.session.id);
+            setMemoryContext(sessRes.session.memory_context);
+            setMessages([
+              {
+                sender: "bot",
+                text: "Hello! I am your legal companion. I can help analyze compliance flags, explain complex clauses, or draft revision suggestions. Ask me anything!",
+                timestamp: new Date(),
+              }
+            ]);
+          }
+        }
+      } catch (err) {
+        console.error("Failed to load chat sessions:", err);
+      }
+    };
+
+    loadSessions();
+  }, [documentName, documentId]);
 
   // Search Match navigation states
   const [matchCount, setMatchCount] = useState(0);
@@ -258,7 +314,8 @@ const AssistantPanel = ({
         history: formattedHistory,
         memoryContext: memoryContext,
         documentId: documentId,
-        documentName: documentName
+        documentName: documentName,
+        sessionId: activeSessionId || undefined
       });
 
       if (res && res.reply) {
@@ -323,6 +380,37 @@ const AssistantPanel = ({
         setIsBotTyping(false);
         setIsThinking(false);
       }
+    }
+  };
+
+  const handleNewChat = async () => {
+    if (isBotTyping || isThinking) return;
+    try {
+      const sessRes = await analysisApi.createSession(documentId, documentName);
+      if (sessRes && sessRes.success && sessRes.session) {
+        setChatSessions((prev) => [sessRes.session, ...prev]);
+        setActiveSessionId(sessRes.session.id);
+        setMemoryContext(sessRes.session.memory_context);
+        setMessages([
+          {
+            id: `bot_welcome_${Date.now()}`,
+            sender: "bot",
+            text: "Started a new chat session. How can I help you today?",
+            timestamp: new Date(),
+          }
+        ]);
+        toast({
+          title: "New Chat Started",
+          description: "A fresh chat session has been initialized.",
+        });
+      }
+    } catch (err) {
+      console.error("Failed to create new session:", err);
+      toast({
+        title: "Error starting chat",
+        description: "Could not create a new chat session.",
+        variant: "destructive",
+      });
     }
   };
 
@@ -414,6 +502,57 @@ const AssistantPanel = ({
       <div className="flex-1 overflow-y-auto pb-6 pr-1 -mr-1 flex flex-col">
         {mainTab === "chatbot" && (
           <div className="flex-1 flex flex-col justify-between min-h-0">
+            {/* Session Toolbar */}
+            <div className="flex items-center justify-between pb-3 border-b border-[#e6e2da] mb-3 shrink-0">
+              <div className="relative">
+                <select
+                  value={activeSessionId || ""}
+                  onChange={async (e) => {
+                    const sessId = e.target.value;
+                    setActiveSessionId(sessId);
+                    const selected = chatSessions.find(s => s.id === sessId);
+                    if (selected) {
+                      setMemoryContext(selected.memory_context);
+                      // Load messages
+                      try {
+                        const msgRes = await analysisApi.getSessionMessages(sessId);
+                        if (msgRes && msgRes.success && msgRes.messages) {
+                          const formattedMsgs = msgRes.messages.map((m: any) => ({
+                            id: m.id ? String(m.id) : undefined,
+                            sender: m.sender as "user" | "bot",
+                            text: m.message_text,
+                            timestamp: m.created_at ? new Date(m.created_at) : new Date()
+                          }));
+                          setMessages(formattedMsgs.length > 0 ? formattedMsgs : [
+                            {
+                              sender: "bot",
+                              text: "Hello! I am your legal companion. I can help analyze compliance flags, explain complex clauses, or draft revision suggestions. Ask me anything!",
+                              timestamp: new Date(),
+                            }
+                          ]);
+                        }
+                      } catch (err) {
+                        console.error("Failed to load session messages:", err);
+                      }
+                    }
+                  }}
+                  className="font-sans text-[11px] font-semibold text-[#555] bg-white border border-[#e6e2da] rounded px-2.5 py-1 outline-none max-w-[170px]"
+                >
+                  {chatSessions.map((s, idx) => (
+                    <option key={s.id} value={s.id}>
+                      Chat Session {chatSessions.length - idx} ({new Date(s.created_at).toLocaleDateString([], { month: "short", day: "numeric" })})
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <button
+                onClick={handleNewChat}
+                className="flex items-center gap-1 font-sans text-[11px] font-bold text-[#2a303a] hover:text-black hover:bg-black/5 px-2.5 py-1 rounded border border-[#d4cfc1] transition-all bg-white shadow-sm"
+              >
+                <Plus size={12} /> New Chat
+              </button>
+            </div>
+
             {/* Messages log */}
             <div className="space-y-4 overflow-y-auto flex-1 pr-1 mb-4">
               {messages.map((msg, i) => (

@@ -38,7 +38,7 @@ function highlightRisksInHtml(html: string, findings: any[]): string {
   if (!html || !findings || findings.length === 0) return html;
 
   let highlightedHtml = html;
-  
+
   // Sort findings by text length descending to avoid nested replacement issues
   const sortedFindings = [...findings].sort((a, b) => b.text.length - a.text.length);
 
@@ -46,20 +46,20 @@ function highlightRisksInHtml(html: string, findings: any[]): string {
     let textToHighlight = finding.text.trim();
     // Strip leading/trailing quotes if they were captured by the model
     textToHighlight = textToHighlight.replace(/^["'“”‘’`]/, "").replace(/["'“”‘’`]$/, "").trim();
-    if (!textToHighlight || textToHighlight.length < 5) return; 
+    if (!textToHighlight || textToHighlight.length < 5) return;
 
     // Escape special regex characters
     const escapedText = textToHighlight.replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
-    
+
     try {
       const riskLower = finding.risk ? finding.risk.toLowerCase() : "low";
       const riskClass = `risk-flag-${riskLower}`;
       const hoverTitle = `${finding.title} (${finding.risk} Risk): ${finding.explanation || ""}`;
-      
+
       // Match text with flexible whitespace and intervening HTML formatting tags
       const flexiblePattern = escapedText.replace(/\s+/g, "(?:\\s+|<[^>]+>)*");
       const regex = new RegExp(`(?![^<>]*>)(${flexiblePattern})`, "gi");
-      
+
       highlightedHtml = highlightedHtml.replace(regex, (match) => {
         if (match.includes("risk-flag-")) {
           return match; // Avoid duplicate wrapping
@@ -76,14 +76,14 @@ function highlightRisksInHtml(html: string, findings: any[]): string {
 
 function highlightSearchInHtml(html: string, query: string): string {
   if (!html || !query.trim() || query.trim().length < 2) return html;
-  
+
   let highlightedHtml = html;
   const escapedQuery = query.trim().replace(/[-\/\\^$*+?.()|[\]{}]/g, "\\$&");
-  
+
   try {
     const flexiblePattern = escapedQuery.replace(/\s+/g, "(?:\\s+|<[^>]+>)*");
     const regex = new RegExp(`(?![^<>]*>)(${flexiblePattern})`, "gi");
-    
+
     highlightedHtml = highlightedHtml.replace(regex, (match) => {
       if (match.includes("search-highlight")) {
         return match;
@@ -93,7 +93,7 @@ function highlightSearchInHtml(html: string, query: string): string {
   } catch (e) {
     console.error("Failed to highlight search query:", query, e);
   }
-  
+
   return highlightedHtml;
 }
 
@@ -371,19 +371,19 @@ export const DocumentEditor = ({
         let currentHtml = el.innerHTML;
         currentHtml = stripRiskHighlights(currentHtml);
         currentHtml = stripSearchHighlights(currentHtml);
-        
+
         let finalHtml = currentHtml;
-        
+
         // 2. Apply risk highlights if findings are present and NO search query is active
         if (analysisFindings && analysisFindings.length > 0 && !searchHighlight) {
           finalHtml = highlightRisksInHtml(finalHtml, analysisFindings);
         }
-        
+
         // 3. Apply search highlights if search query is present
         if (searchHighlight) {
           finalHtml = highlightSearchInHtml(finalHtml, searchHighlight);
         }
-        
+
         // 4. Update DOM if changed
         if (finalHtml !== el.innerHTML) {
           el.innerHTML = finalHtml;

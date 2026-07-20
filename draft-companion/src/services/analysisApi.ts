@@ -35,6 +35,16 @@ export const analysisApi = {
     memoryContext: string | null;
     documentId: string;
     documentName: string;
+    sessionId?: string;
   }) =>
     api.post<ChatResponse>("/api/analysis/chat", payload),
+
+  createSession: (documentId: string, documentName: string) =>
+    api.post<{ success: boolean; session: any }>("/api/analysis/chat/session", { documentId, documentName }),
+
+  getSessions: (documentId: string, documentName: string) =>
+    api.get<{ success: boolean; sessions: any[] }>(`/api/analysis/chat/sessions?documentId=${documentId}&documentName=${encodeURIComponent(documentName)}`),
+
+  getSessionMessages: (sessionId: string) =>
+    api.get<{ success: boolean; messages: any[] }>(`/api/analysis/chat/session/${sessionId}`),
 };

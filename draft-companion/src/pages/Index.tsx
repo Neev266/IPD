@@ -247,7 +247,7 @@ const Index = () => {
     const syncAllData = async () => {
       if (!user?.id) return;
       setIsSyncing(true);
-      
+
       let baseDrafts = initialDrafts;
 
       try {
@@ -300,7 +300,7 @@ const Index = () => {
 
         const finalMerged = [...cleanedDrafts, ...newDraftsToAdd];
         setDrafts(finalMerged);
-        
+
         // Auto-select active draft
         if (finalMerged.length > 0) {
           if (!activeDraft || !finalMerged.some((draft) => draft.id === activeDraft)) {
@@ -360,7 +360,7 @@ const Index = () => {
             prev.map((d) => (d.id === activeDraft ? { ...d, rawHtml: data.html } : d))
           );
           console.log(`[UPLOAD] On-demand parsing succeeded and saved for: ${activeObj.title}`);
-          
+
           // Trigger background vector database ingestion
           try {
             console.log(`[INGEST] Triggering background vector ingestion for: "${activeObj.title}"`);
@@ -449,7 +449,7 @@ const Index = () => {
     try {
       const data = await analysisApi.analyze(htmlToAnalyze, activeDraft, activeObj.title);
       console.log("[ANALYSIS] Received backend response:", data);
-      
+
       let findings = data.analysis?.findings || [];
       if (findings.length === 0) {
         console.log("[ANALYSIS] Findings list is empty. Merging with mock analysis for display.");

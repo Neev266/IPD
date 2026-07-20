@@ -137,17 +137,26 @@ export async function ingestHtmlContent(htmlContent, documentName) {
         }
       }
 
-      if (findingsToInsert.length > 0) {
-        console.log(`[Pipeline Service] Inserting ${findingsToInsert.length} classifications to Supabase...`);
-        const { error: insertError } = await supabase
-          .from("document_classifications")
-          .insert(findingsToInsert);
+      // Always add the SYSTEM_STATUS cache marker row when caching ingestion classifications
+      findingsToInsert.push({
+        document_id: documentId,
+        category: "SYSTEM_STATUS",
+        answer: "CLASSIFICATION_COMPLETED",
+        risk: "Low",
+        explanation: "System cache marker indicating document has been classified.",
+        suggestion: "",
+        confidence_score: 100
+      });
 
-        if (insertError) {
-          console.error("[Pipeline Service Error] Failed to store findings in Supabase:", insertError.message);
-        } else {
-          console.log("[Pipeline Service] Classifications successfully stored in Supabase.");
-        }
+      console.log(`[Pipeline Service] Inserting ${findingsToInsert.length} classifications to Supabase (including status marker)...`);
+      const { error: insertError } = await supabase
+        .from("document_classifications")
+        .insert(findingsToInsert);
+
+      if (insertError) {
+        console.error("[Pipeline Service Error] Failed to store findings in Supabase:", insertError.message);
+      } else {
+        console.log("[Pipeline Service] Classifications successfully stored in Supabase.");
       }
     }
   } catch (error) {

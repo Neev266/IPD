@@ -6,11 +6,15 @@
 
 /* Hide scrollbars globally while keeping scroll functional */
 * {
-  scrollbar-width: none; /* Firefox */
-  -ms-overflow-style: none; /* IE/Edge */
+  scrollbar-width: none;
+  /* Firefox */
+  -ms-overflow-style: none;
+  /* IE/Edge */
 }
+
 *::-webkit-scrollbar {
-  display: none; /* Chrome/Safari/Opera */
+  display: none;
+  /* Chrome/Safari/Opera */
 }
 
 /* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
@@ -101,13 +105,27 @@ All colors MUST be HSL.
 
 /* Analyzing overlay animations */
 @keyframes analyze-spin {
-  from { transform: rotate(0deg); }
-  to { transform: rotate(360deg); }
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 @keyframes analyze-pulse {
-  0%, 100% { opacity: 0.6; transform: scale(1); }
-  50% { opacity: 1; transform: scale(1.12); }
+
+  0%,
+  100% {
+    opacity: 0.6;
+    transform: scale(1);
+  }
+
+  50% {
+    opacity: 1;
+    transform: scale(1.12);
+  }
 }
 
 /* Risk flagging highlights for document analysis */
@@ -175,6 +193,7 @@ All colors MUST be HSL.
     outline: 3px solid rgba(239, 68, 68, 0.8);
     box-shadow: 0 0 15px rgba(239, 68, 68, 0.6);
   }
+
   100% {
     outline: 3px solid transparent;
     box-shadow: 0 0 0 transparent;

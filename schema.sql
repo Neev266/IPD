@@ -64,3 +64,21 @@ CREATE TABLE IF NOT EXISTS public.document_classifications (
     created_at TIMESTAMPTZ DEFAULT NOW()
 );
 
+-- Chat Sessions Table to store dialogue memory contexts
+CREATE TABLE IF NOT EXISTS public.chat_sessions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    document_id UUID NOT NULL REFERENCES public.documents(id) ON DELETE CASCADE,
+    memory_context TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Chat Messages Table to store individual message history logs
+CREATE TABLE IF NOT EXISTS public.chat_messages (
+    id BIGSERIAL PRIMARY KEY,
+    session_id UUID NOT NULL REFERENCES public.chat_sessions(id) ON DELETE CASCADE,
+    sender TEXT NOT NULL, -- 'user' or 'bot'
+    message_text TEXT NOT NULL,
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
